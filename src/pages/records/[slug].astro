@@ -1,0 +1,877 @@
+---
+/**
+ * Liner notes: the full case study for one full-depth record, rendered from
+ * its frontmatter and Markdown body. Section order is fixed:
+ * Credits, The problem, Session notes, B-sides (when there are any), Result &
+ * what I learned, Stack,
+ * then "From the session" (the record's `session` stills and diagrams). The
+ * record's stage (Stage.astro, as in Now Playing) sits under the intro, with
+ * a link that plays the record in the crate. Card records have no page.
+ */
+import type { GetStaticPaths } from 'astro';
+import { render } from 'astro:content';
+import Base from '../../layouts/Base.astro';
+import Sleeve from '../../components/Sleeve.astro';
+import Ph from '../../components/Placeholder.astro';
+import Diagram from '../../components/Diagram.astro';
+import Stage from '../../components/NowPlaying/Stage.astro';
+import { webpSize } from '../../lib/image-size';
+import { isPlaceholder } from '../../lib/placeholder-pattern.mjs';
+import {
+  assetUrl,
+  getRecords,
+  hasStage,
+  isFull,
+  recordSlug,
+  type FullRecordEntry,
+} from '../../lib/records';
+import { url } from '../../lib/url';
+
+export const getStaticPaths = (async () => {
+  const records = (await getRecords()).filter(isFull);
+  return records.map((record, i) => ({
+    params: { slug: recordSlug(record) },
+    props: { record, next: records[(i + 1) % records.length] },
+  }));
+}) satisfies GetStaticPaths;
+
+interface Props {
+  record: FullRecordEntry;
+  next: FullRecordEntry;
+}
+
+const { record, next } = Astro.props;
+const d = record.data;
+const { Content } = await render(record);
+
+const facts = [
+  { label: 'Role', value: d.role },
+  { label: 'Band', value: d.team },
+  { label: 'Recorded', value: d.dates },
+  { label: 'Studio', value: d.org },
+  { label: 'Location', value: d.location },
+  { label: 'Platform', value: d.platform },
+].filter((f): f is { label: string; value: string } => Boolean(f.value));
+
+// "Result & what I learned": each half only when there's something to say.
+const result = d.summary.result;
+const resultLabel =
+  result && d.learned ? 'Result & what I learned' : result ? 'Result' : 'What I learned';
+
+const tracks = [
+  {
+    side: 'A',
+    items: [
+      ['credits', 'Credits'],
+      ['problem', 'The problem'],
+      ['session', 'Session notes'],
+    ],
+  },
+  {
+    side: 'B',
+    items: [
+      ['bsides', 'B-sides'],
+      ['result', resultLabel],
+      ['stack', 'Stack'],
+    ],
+  },
+].map(({ side, items }) => ({
+  side,
+  items: items
+    .filter(([id]) => id !== 'bsides' || d.bsides?.length)
+    .filter(([id]) => id !== 'result' || result || d.learned)
+    .map(([id, label], i) => ({ id, label, no: `${side}${i + 1}` })),
+}));
+// "From the session": extra stills and diagrams (the stage itself is shown above).
+const stills = d.session ?? [];
+const playUrl = `${url('/')}?record=${recordSlug(record)}`;
+
+const trackNo = Object.fromEntries(tracks.flatMap((t) => t.items.map((it) => [it.id, it.no])));
+---
+
+<Base title={`Liner notes: ${d.title}`} description={d.tagline}>
+  <section class="intro page" aria-labelledby="ln-title">
+    <a class="back tap" href={url('/')}>
+      <svg
+        aria-hidden="true"
+        width="18"
+        height="18"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="2"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+      >
+        <path d="M15 5l-7 7 7 7"></path>
+      </svg>
+      Back to the crate
+    </a>
+
+    <div class="intro-grid">
+      <Sleeve record={record} size={400} class="cover" />
+      <div class="intro-text">
+        <p class="eyebrow accent">
+          Liner notes · {d.catalogue}
+          {d.format === '7in' && ' · 7″ single'}
+        </p>
+        <h1 id="ln-title" class="d">
+          {d.title}
+        </h1>
+        <p class="tagline">
+          <Ph text={d.tagline} />
+        </p>
+        <dl class="facts">
+          {facts.map((f) => (
+            <div>
+              <dt class="eyebrow">{f.label}</dt>
+              <dd>
+                <Ph text={f.value} />
+              </dd>
+            </div>
+          ))}
+        </dl>
+        <a class="play" href={playUrl}>
+          <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M8 5v14l11-7z"></path>
+          </svg>
+          Play it in the crate
+        </a>
+      </div>
+    </div>
+  </section>
+
+  {hasStage(record) && (
+    <section class="page stage-wrap" aria-label={`${d.title}: on stage`}>
+      <Stage record={record} context="page" />
+    </section>
+  )}
+
+  <nav class="page tracklist-wrap" aria-labelledby="tracks-h">
+    <div class="tracklist">
+      <h2 id="tracks-h" class="d">
+        Tracklist
+      </h2>
+      {tracks.map((t) => (
+        <div class="side">
+          <p class="side-label">Side {t.side}</p>
+          <ul>
+            {t.items.map((it) => (
+              <li>
+                <a href={`#${it.id}`}>
+                  <span class="no d" aria-hidden="true">
+                    {it.no}
+                  </span>
+                  {it.label}
+                </a>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ))}
+    </div>
+  </nav>
+
+  <article class="page notes">
+    <section id="credits" class="track" aria-labelledby="credits-h">
+      <div class="track-head">
+        <p class="no d" aria-hidden="true">
+          {trackNo.credits}
+        </p>
+        <h2 id="credits-h" class="d">
+          Credits
+        </h2>
+      </div>
+      <div class="credits">
+        <div class="card card--raised">
+          <p class="eyebrow accent">Darren played</p>
+          <p class="card-title d">
+            <Ph text={d.role} />
+          </p>
+          <ul>
+            {d.credits.darren.map((c) => (
+              <li>
+                <Ph text={c} />
+              </li>
+            ))}
+          </ul>
+        </div>
+        {d.credits.team.length > 0 && (
+          <div class="card">
+            <p class="eyebrow">The band played</p>
+            <p class="card-title d">
+              <Ph text={d.team ?? 'The team'} />
+            </p>
+            <ul>
+              {d.credits.team.map((c) => (
+                <li>
+                  <Ph text={c} />
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+      </div>
+    </section>
+
+    <section id="problem" class="track" aria-labelledby="problem-h">
+      <div class="track-head">
+        <p class="no d" aria-hidden="true">
+          {trackNo.problem}
+        </p>
+        <h2 id="problem-h" class="d">
+          The problem
+        </h2>
+      </div>
+      <div class="problem">
+        <p class="statement d">
+          <Ph text={d.summary.problem} />
+        </p>
+        <div class="prose">
+          <Content />
+        </div>
+      </div>
+    </section>
+
+    <section id="session" class="track" aria-labelledby="session-h">
+      <div class="track-head">
+        <p class="no d" aria-hidden="true">
+          {trackNo.session}
+        </p>
+        <h2 id="session-h" class="d">
+          Session notes
+        </h2>
+        <p class="sub">Key decisions: what made the cut, and what didn't.</p>
+      </div>
+      <ol class="cards">
+        {d.decisions.map((dec, i) => (
+          <li class="card card--raised">
+            <p class="eyebrow accent">Take {i + 1}</p>
+            <h3 class="d">
+              <Ph text={dec.topic} />
+            </h3>
+            <dl class="take">
+              <div>
+                <dt>Chose</dt>
+                <dd>
+                  <Ph text={dec.chose} />
+                </dd>
+              </div>
+              {dec.rejected && (
+                <div>
+                  <dt>Rejected</dt>
+                  <dd>
+                    <Ph text={dec.rejected} />
+                  </dd>
+                </div>
+              )}
+              {dec.why && (
+                <div>
+                  <dt>Why</dt>
+                  <dd>
+                    <Ph text={dec.why} />
+                  </dd>
+                </div>
+              )}
+            </dl>
+          </li>
+        ))}
+      </ol>
+    </section>
+
+    {d.bsides?.length ? (
+      <section id="bsides" class="track" aria-labelledby="bsides-h">
+        <div class="track-head">
+          <p class="no d" aria-hidden="true">
+            {trackNo.bsides}
+          </p>
+          <h2 id="bsides-h" class="d">
+            B-sides
+          </h2>
+          <p class="sub">Ideas that were recorded, then left off the album.</p>
+        </div>
+        <ol class="cards">
+          {d.bsides.map((b, i) => (
+            <li class="card card--dashed">
+              <p class="eyebrow">Unreleased · {i + 1}</p>
+              <h3 class="d">
+                <Ph text={b.idea} />
+              </h3>
+              <p>
+                <strong>Why it was cut:</strong> <Ph text={b.whyCut} />
+              </p>
+            </li>
+          ))}
+        </ol>
+      </section>
+    ) : null}
+
+    {(result || d.learned) && (
+      <section id="result" class="track" aria-labelledby="result-h">
+        <div class="track-head">
+          <p class="no d" aria-hidden="true">
+            {trackNo.result}
+          </p>
+          <h2 id="result-h" class="d">
+            {resultLabel}
+          </h2>
+        </div>
+        <div class="pair">
+          {result && (
+            <div>
+              <h3 class="eyebrow">Result</h3>
+              <p>
+                <Ph text={result} />
+              </p>
+            </div>
+          )}
+          {d.learned && (
+            <div>
+              <h3 class="eyebrow">What I learned</h3>
+              <p>
+                <Ph text={d.learned} />
+              </p>
+            </div>
+          )}
+        </div>
+      </section>
+    )}
+
+    <section id="stack" class="track" aria-labelledby="stack-h">
+      <div class="track-head">
+        <p class="no d" aria-hidden="true">
+          {trackNo.stack}
+        </p>
+        <h2 id="stack-h" class="d">
+          Stack
+        </h2>
+      </div>
+      {d.teamStack?.length ? (
+        <div class="stack-groups">
+          <div>
+            <h3 class="eyebrow accent">Darren used</h3>
+            <ul class="stack">
+              {d.stack.map((s) => (
+                <li class="d">
+                  <Ph text={s} />
+                </li>
+              ))}
+            </ul>
+          </div>
+          <div>
+            <h3 class="eyebrow">The band used</h3>
+            <ul class="stack">
+              {d.teamStack.map((s) => (
+                <li class="d">
+                  <Ph text={s} />
+                </li>
+              ))}
+            </ul>
+          </div>
+        </div>
+      ) : (
+        <ul class="stack">
+          {d.stack.map((s) => (
+            <li class="d">
+              <Ph text={s} />
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+    {stills.length > 0 && (
+      <section class="stills" aria-labelledby="stills-h">
+        <h2 id="stills-h" class="d">
+          From the session
+        </h2>
+        <div class="stills-grid">
+          {stills.map((still) =>
+            'steps' in still ? (
+              <Diagram class="still-wide" steps={still.steps} caption={still.caption} />
+            ) : (
+              <figure>
+                {isPlaceholder(still.src) ? (
+                  <p class="still-pending">
+                    <Ph text={still.src} />
+                  </p>
+                ) : (
+                  <img
+                    src={assetUrl(still.src)}
+                    alt={still.alt}
+                    {...webpSize(still.src)}
+                    loading="lazy"
+                    decoding="async"
+                  />
+                )}
+                {still.caption && (
+                  <figcaption>
+                    <Ph text={still.caption} />
+                  </figcaption>
+                )}
+              </figure>
+            ),
+          )}
+        </div>
+      </section>
+    )}
+  </article>
+
+  {next.id !== record.id && (
+    <section class="page next-wrap" aria-label="Next record">
+      <a
+        class="next"
+        href={url(`/records/${recordSlug(next)}/`)}
+        style={`--ground:${next.data.cover.ground}; --sleeve-ink:${next.data.cover.ink}`}
+      >
+        <span class="next-text">
+          <span class="eyebrow">Next record · {next.data.catalogue}</span>
+          <span class="next-title d">{next.data.title}</span>
+        </span>
+        <svg
+          aria-hidden="true"
+          width="48"
+          height="48"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="1.8"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        >
+          <path d="M5 12h14M13 6l6 6-6 6" />
+        </svg>
+      </a>
+    </section>
+  )}
+</Base>
+
+<style>
+  .intro {
+    padding-block: 8px 56px;
+  }
+
+  .back {
+    gap: 8px;
+    margin-bottom: 20px;
+    font-size: 0.9375rem;
+    font-weight: 600;
+    color: var(--ink);
+    text-decoration: none;
+  }
+
+  .back:hover {
+    color: var(--accent);
+  }
+
+  .intro-grid {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    gap: 40px 56px;
+  }
+
+  .intro-grid :global(.cover) {
+    box-shadow:
+      0 2px 0 rgba(0, 0, 0, 0.1),
+      0 30px 40px -24px rgba(40, 25, 10, 0.6);
+  }
+
+  .intro-text {
+    flex: 1 1 480px;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
+
+  .accent {
+    color: var(--accent);
+  }
+
+  h1 {
+    font-size: clamp(4rem, 11vw, 10.5rem);
+    line-height: 0.8;
+    font-weight: 900;
+    overflow-wrap: anywhere;
+  }
+
+  .tagline {
+    max-width: 620px;
+    font-size: clamp(1.125rem, 2vw, 1.375rem);
+    line-height: 1.4;
+  }
+
+  .facts {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(140px, 100%), 1fr));
+    gap: 16px 24px;
+    margin-top: 8px;
+    padding-top: 18px;
+    border-top: 1px solid var(--line);
+  }
+
+  .facts dd {
+    margin-top: 4px;
+    font-weight: 600;
+  }
+
+  .play {
+    align-self: flex-start;
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    min-height: 52px;
+    padding: 0 24px;
+    border-radius: var(--radius-pill);
+    background: var(--accent);
+    color: var(--accent-ink);
+    font-weight: 700;
+    text-decoration: none;
+  }
+
+  .play:hover {
+    background: var(--accent-hover);
+    color: var(--accent-ink);
+  }
+
+  .stage-wrap {
+    display: flex;
+    justify-content: center;
+    padding-bottom: 64px;
+  }
+
+  .stage-wrap > :global(.stage) {
+    width: 100%;
+    max-width: 900px;
+    display: flex;
+    justify-content: center;
+  }
+
+  .stage-wrap :global(.stage > *) {
+    width: 100%;
+  }
+
+  /* Tracklist */
+  .tracklist-wrap {
+    padding-bottom: 64px;
+  }
+
+  .tracklist {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 24px 64px;
+    padding: 32px clamp(20px, 3vw, 40px);
+    background: var(--ink);
+    color: var(--paper);
+  }
+
+  .tracklist h2 {
+    flex: 0 0 180px;
+    font-size: 2.25rem;
+    line-height: 0.95;
+  }
+
+  .side {
+    flex: 1 1 260px;
+  }
+
+  .side-label {
+    margin-bottom: 6px;
+    font-size: 0.75rem;
+    font-weight: 700;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: #d9cfbf;
+  }
+
+  .side ul {
+    padding: 0;
+    list-style: none;
+  }
+
+  .side a {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    min-height: var(--tap);
+    color: var(--paper);
+    font-size: 1.0625rem;
+    font-weight: 500;
+    text-decoration: none;
+  }
+
+  .side a:hover {
+    text-decoration: underline;
+    text-underline-offset: 4px;
+  }
+
+  .side a:focus-visible {
+    outline-color: #e3b25a;
+  }
+
+  .side .no {
+    width: 32px;
+    font-size: 1.375rem;
+    color: #e3b25a;
+  }
+
+  /* Sections */
+  .track {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 24px 48px;
+    padding-block: 48px;
+    border-top: 2px solid var(--ink);
+  }
+
+  .track-head {
+    flex: 0 0 240px;
+  }
+
+  .track-head .no {
+    font-size: 1.375rem;
+    color: var(--accent);
+  }
+
+  .track-head h2 {
+    margin-top: 2px;
+    font-size: clamp(2.5rem, 5vw, 3.5rem);
+    line-height: 0.95;
+    font-weight: 900;
+  }
+
+  .sub {
+    margin-top: 12px;
+    font-size: 0.9375rem;
+    color: var(--muted);
+  }
+
+  .credits,
+  .problem,
+  .cards,
+  .pair,
+  .stack {
+    flex: 1 1 560px;
+    min-width: 0;
+  }
+
+  .credits,
+  .cards,
+  .pair {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(280px, 100%), 1fr));
+    gap: 20px 40px;
+  }
+
+  .cards {
+    gap: 20px;
+    padding: 0;
+    list-style: none;
+  }
+
+  .card {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    padding: 24px;
+    border: 1px solid var(--line);
+  }
+
+  .card--raised {
+    background: var(--paper-raised);
+  }
+
+  .card--dashed {
+    border: 1.5px dashed #8a7f70;
+  }
+
+  .card-title {
+    font-size: 2rem;
+    line-height: 1;
+  }
+
+  .card ul {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding-left: 20px;
+  }
+
+  .card h3 {
+    font-size: 1.875rem;
+    line-height: 1;
+  }
+
+  .take {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    font-size: 0.9375rem;
+  }
+
+  .take dt {
+    font-weight: 700;
+  }
+
+  .take dd {
+    margin-top: 2px;
+  }
+
+  .problem {
+    display: flex;
+    flex-direction: column;
+    gap: 28px;
+    max-width: 820px;
+  }
+
+  .statement {
+    font-size: clamp(1.875rem, 3.6vw, 2.75rem);
+    line-height: 1.02;
+    font-weight: 700;
+    text-transform: none;
+    text-wrap: balance;
+  }
+
+  .prose {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    font-size: 1.0625rem;
+    line-height: 1.6;
+  }
+
+  .prose :global(ul) {
+    padding-left: 20px;
+  }
+
+  .pair > div {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding-top: 14px;
+    border-top: 1px solid var(--line);
+  }
+
+  .pair p {
+    font-size: 1.125rem;
+    line-height: 1.55;
+  }
+
+  .stack {
+    display: flex;
+    flex-wrap: wrap;
+    align-content: flex-start;
+    gap: 12px;
+    padding: 0;
+    list-style: none;
+  }
+
+  /* Darren's tools and the team's, when a record lists both */
+  .stack-groups {
+    flex: 1 1 560px;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 28px;
+  }
+
+  .stack-groups .stack {
+    flex: none;
+    margin-top: 12px;
+  }
+
+  .stack li {
+    padding: 10px 22px;
+    border: 2px solid var(--ink);
+    border-radius: var(--radius-pill);
+    font-size: 1.875rem;
+    line-height: 1;
+  }
+
+  /* Stills */
+  .stills {
+    padding-block: 48px;
+    border-top: 2px solid var(--ink);
+  }
+
+  .stills h2 {
+    margin-bottom: 24px;
+    font-size: clamp(2.5rem, 5vw, 3.5rem);
+    line-height: 0.95;
+    font-weight: 900;
+  }
+
+  .stills-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(300px, 100%), 1fr));
+    align-items: start;
+    gap: 24px;
+  }
+
+  figure {
+    margin: 0;
+  }
+
+  figure img {
+    display: block;
+    width: 100%;
+    height: auto;
+    background: var(--paper-raised);
+    box-shadow: var(--shadow-paper);
+  }
+
+  figcaption {
+    margin-top: 10px;
+    font-size: 0.9375rem;
+    color: var(--muted);
+  }
+
+  .stills-grid > :global(.still-wide) {
+    grid-column: 1 / -1;
+  }
+
+  .still-pending {
+    display: grid;
+    place-items: center;
+    aspect-ratio: 16 / 10;
+    border: 1.5px dashed #8a7f70;
+  }
+
+  /* Next record */
+  .next-wrap {
+    padding-block: 16px 0;
+  }
+
+  .next {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 20px;
+    padding: 32px clamp(20px, 3vw, 40px);
+    background: var(--ground);
+    color: var(--sleeve-ink);
+    text-decoration: none;
+    box-shadow: var(--shadow-sleeve);
+  }
+
+  .next:hover {
+    color: var(--sleeve-ink);
+  }
+
+  .next-text {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .next .eyebrow {
+    color: inherit;
+  }
+
+  .next-title {
+    font-size: clamp(2.5rem, 6vw, 4rem);
+    line-height: 0.9;
+    font-weight: 900;
+  }
+</style>

@@ -1,0 +1,105 @@
+---
+/**
+ * Now Playing (Phase 2): the record that's playing, its stage and a summary.
+ *
+ * Renders two empty shells and one inert <template> per record. When a sleeve
+ * dispatches `record:play`, now-playing.ts clones that record's template into:
+ * - ≥ 900px: the <section> below the crate (not a modal; focus moves to its heading)
+ * - < 900px: the bottom-sheet <dialog> (showModal: focus trapped, Esc closes)
+ *
+ * Template content doesn't load, so no images, video or iframes are fetched
+ * until a record is played. Without JS nothing here is shown, and sleeves
+ * stay plain links.
+ */
+import NowPlayingRecord from './NowPlayingRecord.astro';
+import { recordSlug, type RecordEntry } from '../../lib/records';
+
+interface Props {
+  records: RecordEntry[];
+}
+
+const { records } = Astro.props;
+---
+
+<section
+  id="now-playing"
+  class="np-panel page"
+  aria-labelledby="np-title"
+  hidden
+  data-np-panel
+></section>
+<script is:inline>
+  // Desktop deep link (?record=): open the panel's space before first paint, so
+  // the content below it doesn't jump when now-playing.ts fills it in (CLS).
+  (function () {
+    var panel = document.getElementById('now-playing');
+    if (panel && /[?&]record=/.test(location.search) && matchMedia('(min-width: 900px)').matches) {
+      panel.hidden = false;
+      panel.style.minHeight = '640px';
+    }
+  })();
+</script>
+
+<dialog class="np-sheet" aria-labelledby="np-title" data-np-sheet></dialog>
+
+{records.map((record) => (
+  <template data-np={recordSlug(record)} data-section={record.data.section}>
+    <NowPlayingRecord record={record} />
+  </template>
+))}
+
+<script>
+  import { initNowPlaying } from './now-playing';
+
+  initNowPlaying();
+</script>
+
+<style>
+  .np-panel {
+    padding-block: 24px 64px;
+    scroll-margin-top: 16px;
+  }
+
+  .np-sheet {
+    position: fixed;
+    inset: auto 0 0;
+    width: 100%;
+    max-width: 100%;
+    height: calc(100dvh - 64px);
+    max-height: none;
+    margin: 0;
+    padding: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    border: 0;
+    border-radius: 22px 22px 0 0;
+    background: var(--paper);
+    color: var(--ink);
+    box-shadow: 0 -10px 30px rgba(27, 23, 20, 0.3);
+  }
+
+  .np-sheet::backdrop {
+    background: rgba(27, 23, 20, 0.58);
+  }
+
+  .np-sheet[open] {
+    animation: sheet-up var(--duration) var(--ease-out);
+  }
+
+  /* Deep links open without animation; while dragging, the sheet follows the
+     finger, and releasing early springs back. */
+  .np-sheet[data-instant],
+  .np-sheet[data-dragging] {
+    animation: none;
+  }
+
+  .np-sheet[data-settling] {
+    transition: transform var(--duration) var(--ease-out);
+  }
+
+  @keyframes sheet-up {
+    from {
+      transform: translateY(100%);
+    }
+  }
+</style>

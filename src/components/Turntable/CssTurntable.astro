@@ -1,0 +1,370 @@
+---
+/**
+ * The CSS turntable (docs/design/NowPlaying.dc.html): a dark plinth, platter,
+ * a grooved record with a label in the record's cover colours, a static
+ * highlight, and a tonearm that swings in on open. Phase 3's three.js deck
+ * replaces it; this stays as the no-WebGL fallback.
+ *
+ * - 12in: 33⅓ rpm (1.8s a turn). 7in: drawn smaller, 45 rpm (≈1.33s a turn).
+ * - The spin pauses when an ancestor has [data-paused]; the tonearm swing is
+ *   skipped when an ancestor has [data-instant] (deep links).
+ * - Reduced motion: global.css cuts animations to ~0, so the record sits still
+ *   on the platter and the arm is already in place.
+ *
+ * Coordinates are the mockup's 540-wide figure, scaled with --u.
+ *
+ * The sleeve leaning behind the deck is filled in at runtime (now-playing.ts
+ * copies the crate's sleeve into [data-np-sleeve]), so the 16 Now Playing
+ * templates don't each carry a copy of the cover art.
+ */
+import type { RecordEntry } from '../../lib/records';
+
+interface Props {
+  record: RecordEntry;
+}
+
+const { record } = Astro.props;
+const { title, catalogue, format, cover } = record.data;
+const is7in = format === '7in';
+const accent = cover.accents[0] ?? cover.ink;
+const rpm = is7in ? '45 RPM' : '33⅓ RPM';
+---
+
+<figure
+  class:list={['turntable', is7in && 'turntable--7in']}
+  style={`--ground:${cover.ground}; --label-ink:${cover.ink}; --label-accent:${accent}`}
+>
+  <div class="deck-area" aria-hidden="true">
+    <div class="leaning" data-np-sleeve></div>
+    <div class="plinth">
+      <div class="platter"></div>
+      <div class="record">
+        <div class="label">
+          <span class="label-dot"></span>
+          <span class="label-title">{title}</span>
+          <span class="label-cat">
+            {catalogue} · {is7in ? '45' : 'A'}
+          </span>
+        </div>
+      </div>
+      <div class="shine"></div>
+      <div class="spindle"></div>
+      <div class="arm-base"></div>
+      <div class="arm-pivot"></div>
+      <div class="arm-weight"></div>
+      <div class="tonearm">
+        <div class="arm"></div>
+        <div class="headshell"></div>
+      </div>
+      <div class="rpm">
+        <span></span>
+        {rpm}
+      </div>
+    </div>
+  </div>
+  <figcaption class="visually-hidden">
+    {catalogue}
+    {title} on the turntable at {is7in ? '45' : '33⅓'} rpm.
+  </figcaption>
+</figure>
+
+<style>
+  .turntable {
+    margin: 0;
+    width: 100%;
+    max-width: 540px;
+    container-type: inline-size;
+  }
+
+  .deck-area {
+    --u: calc(100cqw / 540);
+    position: relative;
+    aspect-ratio: 540 / 530;
+  }
+
+  .leaning {
+    position: absolute;
+    left: calc(24 * var(--u));
+    top: 0;
+    width: calc(230 * var(--u));
+    transform: rotate(-7deg);
+  }
+
+  .leaning :global(.sleeve) {
+    width: 100%;
+  }
+
+  /* The three.js deck (webgl-turntable.ts) covers this figure on desktop: the
+     CSS plinth fades out under it, the leaning sleeve stays behind it. */
+  .deck-area :global(.tt3d) {
+    position: absolute;
+    inset: 0;
+    opacity: 0;
+    transition: opacity calc(var(--duration) * 1.5) var(--ease-out);
+  }
+
+  .deck-area :global(.tt3d canvas) {
+    display: block;
+    width: 100%;
+    height: 100%;
+  }
+
+  .deck-area[data-tt3d='on'] :global(.tt3d) {
+    opacity: 1;
+  }
+
+  .deck-area[data-tt3d='on'] .plinth {
+    opacity: 0;
+  }
+
+  .plinth {
+    transition: opacity calc(var(--duration) * 1.5) var(--ease-out);
+  }
+
+  .plinth {
+    position: absolute;
+    left: 0;
+    top: calc(100 * var(--u));
+    width: 100%;
+    height: calc(420 * var(--u));
+    border-radius: calc(16 * var(--u));
+    background: #2b2724;
+    box-shadow:
+      inset 0 2px 0 #46403b,
+      0 34px 40px -24px rgba(40, 25, 10, 0.65);
+  }
+
+  .plinth > div {
+    position: absolute;
+    border-radius: 50%;
+  }
+
+  .platter {
+    left: calc(26 * var(--u));
+    top: calc(26 * var(--u));
+    width: calc(368 * var(--u));
+    height: calc(368 * var(--u));
+    background: #8e8a84;
+    box-shadow:
+      inset 0 0 0 3px #a6a29b,
+      0 6px 14px rgba(0, 0, 0, 0.45);
+  }
+
+  /* The record: centred on the platter (210, 210) */
+  .record {
+    --d: 352;
+    left: calc((210 - var(--d) / 2) * var(--u));
+    top: calc((210 - var(--d) / 2) * var(--u));
+    width: calc(var(--d) * var(--u));
+    height: calc(var(--d) * var(--u));
+    display: grid;
+    place-items: center;
+    background: repeating-radial-gradient(
+      circle at center,
+      #141210 0 calc(1.3 * var(--u)),
+      #221e1b calc(1.3 * var(--u)) calc(2.6 * var(--u))
+    );
+    box-shadow: 0 0 0 calc(2 * var(--u)) #0e0c0b;
+    animation: spin 1.8s linear infinite;
+  }
+
+  .turntable--7in .record {
+    --d: 212;
+    animation-duration: 1.333s;
+  }
+
+  :global([data-paused]) .record {
+    animation-play-state: paused;
+  }
+
+  @keyframes spin {
+    to {
+      transform: rotate(360deg);
+    }
+  }
+
+  .label {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: calc(3 * var(--u));
+    width: calc(120 * var(--u));
+    height: calc(120 * var(--u));
+    border-radius: 50%;
+    overflow: hidden;
+    background: var(--ground);
+    color: var(--label-ink);
+    text-align: center;
+  }
+
+  .turntable--7in .label {
+    width: calc(84 * var(--u));
+    height: calc(84 * var(--u));
+  }
+
+  .label-dot {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: 66%;
+    height: 66%;
+    border-radius: 50%;
+    background: var(--label-accent);
+    opacity: 0.85;
+  }
+
+  .label-title {
+    position: relative;
+    max-width: 86%;
+    font-family: var(--font-display);
+    font-size: calc(20 * var(--u));
+    font-weight: 900;
+    line-height: 0.95;
+    text-transform: uppercase;
+    overflow-wrap: anywhere;
+  }
+
+  .turntable--7in .label-title {
+    font-size: calc(14 * var(--u));
+  }
+
+  .label-cat {
+    position: relative;
+    font-size: calc(8 * var(--u));
+    font-weight: 700;
+    letter-spacing: 0.14em;
+  }
+
+  /* A soft highlight that stays put while the record turns */
+  .shine {
+    left: calc(34 * var(--u));
+    top: calc(34 * var(--u));
+    width: calc(352 * var(--u));
+    height: calc(352 * var(--u));
+    background: conic-gradient(
+      from 20deg,
+      rgba(255, 255, 255, 0) 0deg,
+      rgba(255, 255, 255, 0.08) 28deg,
+      rgba(255, 255, 255, 0) 56deg,
+      rgba(255, 255, 255, 0) 180deg,
+      rgba(255, 255, 255, 0.06) 208deg,
+      rgba(255, 255, 255, 0) 236deg
+    );
+    pointer-events: none;
+  }
+
+  .turntable--7in .shine {
+    left: calc(104 * var(--u));
+    top: calc(104 * var(--u));
+    width: calc(212 * var(--u));
+    height: calc(212 * var(--u));
+  }
+
+  .spindle {
+    left: calc(205 * var(--u));
+    top: calc(205 * var(--u));
+    width: calc(10 * var(--u));
+    height: calc(10 * var(--u));
+    background: #d8d4cd;
+  }
+
+  .arm-base {
+    left: calc(440 * var(--u));
+    top: calc(34 * var(--u));
+    width: calc(72 * var(--u));
+    height: calc(72 * var(--u));
+    background: #3a3531;
+    box-shadow:
+      inset 0 2px 0 #4c4641,
+      0 4px 8px rgba(0, 0, 0, 0.4);
+  }
+
+  .arm-pivot {
+    left: calc(459 * var(--u));
+    top: calc(53 * var(--u));
+    width: calc(34 * var(--u));
+    height: calc(34 * var(--u));
+    background: #9c9891;
+  }
+
+  .arm-weight {
+    left: calc(480 * var(--u));
+    top: calc(10 * var(--u));
+    width: calc(30 * var(--u));
+    height: calc(30 * var(--u));
+    background: #55504a;
+    box-shadow: inset 0 2px 0 #6a645e;
+  }
+
+  /* The tonearm rotates around the pivot (476, 70); at rest it points down,
+     past the platter's edge, and swings onto the record when a record plays. */
+  .plinth > .tonearm {
+    left: calc(476 * var(--u));
+    top: calc(70 * var(--u));
+    width: 0;
+    height: 0;
+    border-radius: 0;
+    transform: rotate(var(--arm-play));
+    animation: arm-in 400ms var(--ease-out) both;
+    --arm-rest: 95deg;
+    --arm-play: 124deg;
+  }
+
+  .turntable--7in .tonearm {
+    --arm-play: 135deg;
+  }
+
+  :global([data-instant]) .plinth > .tonearm {
+    animation: none;
+  }
+
+  @keyframes arm-in {
+    from {
+      transform: rotate(var(--arm-rest));
+    }
+  }
+
+  .arm {
+    position: absolute;
+    left: 0;
+    top: calc(-3 * var(--u));
+    width: calc(268 * var(--u));
+    height: calc(6 * var(--u));
+    border-radius: calc(3 * var(--u));
+    background: #d3cfc8;
+    box-shadow: 0 3px 4px rgba(0, 0, 0, 0.35);
+  }
+
+  .headshell {
+    position: absolute;
+    left: calc(250 * var(--u));
+    top: calc(-9 * var(--u));
+    width: calc(38 * var(--u));
+    height: calc(18 * var(--u));
+    border-radius: 3px;
+    background: var(--ink);
+    box-shadow: inset 0 0 0 2px #6a645e;
+  }
+
+  .plinth > .rpm {
+    left: calc(30 * var(--u));
+    bottom: calc(16 * var(--u));
+    display: flex;
+    align-items: center;
+    gap: calc(10 * var(--u));
+    border-radius: 0;
+    font-size: max(10px, calc(11 * var(--u)));
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    color: #c9c3ba;
+  }
+
+  .rpm span {
+    width: calc(8 * var(--u));
+    height: calc(8 * var(--u));
+    border-radius: 50%;
+    background: #c2603a;
+  }
+</style>

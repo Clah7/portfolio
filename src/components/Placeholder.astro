@@ -1,0 +1,16 @@
+---
+/**
+ * Renders a string, turning any placeholder (caps in square brackets) inside it into a visible
+ * <mark class="ph"> chip. Use for every frontmatter/site string on the page.
+ *   <Ph text={record.data.role} />
+ */
+import { splitPlaceholders } from '../lib/placeholder-pattern.mjs';
+
+interface Props {
+  text: string;
+}
+
+const parts = splitPlaceholders(Astro.props.text);
+---
+
+{parts.map((p) => (p.placeholder ? <mark class="ph">{p.value}</mark> : p.value))}

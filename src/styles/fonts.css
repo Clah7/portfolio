@@ -1,0 +1,16 @@
+/*
+ * Font families. The @font-face rules live in src/components/FontFaces.astro so
+ * the preload link and the face share one hashed, self-hosted URL.
+ * Permanent Marker is for the crate's box label ONLY.
+ */
+.d {
+  font-family: var(--font-display);
+  font-weight: 800;
+  line-height: var(--leading-display);
+  text-transform: uppercase;
+}
+
+.box-label {
+  font-family: var(--font-marker);
+  font-weight: 400;
+}

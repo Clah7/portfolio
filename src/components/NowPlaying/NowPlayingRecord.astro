@@ -1,0 +1,676 @@
+---
+/**
+ * One record's Now Playing content, rendered inside a <template> and cloned
+ * into the desktop panel (.np-panel) or the mobile sheet (.np-sheet) by
+ * now-playing.ts. One set of markup, two layouts:
+ *
+ * - Panel (≥ 900px, docs/design/NowPlaying.dc.html): a top bar ("Put it back
+ *   in the crate", "Now playing · Side A"), then turntable | stage | summary.
+ * - Sheet (< 900px, docs/design/MobileNowPlaying.dc.html): grabber, a mini
+ *   spinning record + title row + close, the stage, the summary, and a sticky
+ *   bar with the main link.
+ */
+import { render } from 'astro:content';
+import Ph from '../Placeholder.astro';
+import Stage from './Stage.astro';
+import CssTurntable from '../Turntable/CssTurntable.astro';
+import { isPlaceholder } from '../../lib/placeholder-pattern.mjs';
+import {
+  assetUrl,
+  hasStage,
+  isFull,
+  recordHref,
+  recordSlug,
+  type RecordEntry,
+} from '../../lib/records';
+
+interface Props {
+  record: RecordEntry;
+}
+
+const { record } = Astro.props;
+const d = record.data;
+const full = isFull(record);
+const is7in = d.format === '7in';
+const { Content } = full ? { Content: null } : await render(record);
+const label = is7in ? 'Single · 45 rpm' : 'Now playing · Side A';
+// The longest word must fit the title column (Big Shoulders caps ≈ 0.56em each).
+const longestWord = Math.max(...d.title.split(/\s+/).map((w) => w.length));
+const titleFit = `${(100 / (longestWord * 0.56)).toFixed(2)}cqw`;
+const meta = [d.role, d.team, d.dates, d.org ?? d.location].filter((v): v is string => Boolean(v));
+
+const links = (d.links ?? []).filter((l) => !isPlaceholder(l.href));
+const pendingLinks = (d.links ?? []).filter((l) => isPlaceholder(l.href));
+// The main call to action: liner notes for full records, the first link for cards.
+const cta = full
+  ? { label: 'Read the liner notes', href: recordHref(record) }
+  : links[0] && { label: links[0].label, href: assetUrl(links[0].href) };
+const otherLinks = full ? links : links.slice(1);
+---
+
+<div
+  class:list={['np', is7in && 'np--7in', !hasStage(record) && 'np--no-stage']}
+  data-np-root
+  data-slug={recordSlug(record)}
+  data-title={d.title}
+  data-catalogue={d.catalogue}
+  data-format={d.format}
+  data-ground={d.cover.ground}
+  data-ink={d.cover.ink}
+  data-accents={d.cover.accents.join(',')}
+  style={`--ground:${d.cover.ground}; --label-ink:${d.cover.ink}`}
+>
+  <div class="grabber" aria-hidden="true" data-np-grab>
+    <span></span>
+  </div>
+
+  <div class="bar">
+    <button type="button" class="back" data-np-close>
+      <svg
+        aria-hidden="true"
+        width="18"
+        height="18"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="2"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+      >
+        <path d="M15 5l-7 7 7 7"></path>
+      </svg>
+      Put it back in the crate
+    </button>
+    <p class="label">
+      <span aria-hidden="true"></span>
+      {label}
+    </p>
+  </div>
+
+  <div class="deck">
+    <CssTurntable record={record} />
+  </div>
+
+  <div class="head">
+    <div class="mini" aria-hidden="true">
+      <span class="mini-label"></span>
+    </div>
+    <div class="titles">
+      <p class="label label--sheet">
+        <span aria-hidden="true"></span>
+        {label}
+      </p>
+      <h2 id="np-title" class="title d" tabindex="-1" style={`--title-fit:${titleFit}`}>
+        <span class="visually-hidden">Now playing: </span>
+        {d.title}
+      </h2>
+      <p class="meta">
+        {d.catalogue}
+        {meta.map((m) => (
+          <>
+            {' · '}
+            <Ph text={m} />
+          </>
+        ))}
+      </p>
+    </div>
+    <button type="button" class="close round" data-np-close>
+      <svg
+        aria-hidden="true"
+        width="18"
+        height="18"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="2.2"
+        stroke-linecap="round"
+      >
+        <path d="M6 6l12 12M18 6L6 18"></path>
+      </svg>
+      <span class="visually-hidden">Put it back in the crate</span>
+    </button>
+  </div>
+
+  <div class="controls">
+    <button type="button" class="pause pill" aria-pressed="false" data-np-pause>
+      <svg
+        class="icon-pause"
+        aria-hidden="true"
+        width="16"
+        height="16"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="2.4"
+        stroke-linecap="round"
+      >
+        <path d="M8 5v14M16 5v14"></path>
+      </svg>
+      <svg
+        class="icon-play"
+        aria-hidden="true"
+        width="16"
+        height="16"
+        viewBox="0 0 24 24"
+        fill="currentColor"
+      >
+        <path d="M8 5v14l11-7z"></path>
+      </svg>
+      Pause
+    </button>
+  </div>
+
+  <div class="stage-col">
+    <Stage record={record} context="panel" />
+  </div>
+
+  <div class="summary">
+    {full ? (
+      <dl class="facts">
+        <div>
+          <dt>The problem</dt>
+          <dd>
+            <Ph text={d.summary!.problem} />
+          </dd>
+        </div>
+        <div>
+          <dt>My role</dt>
+          <dd>
+            <Ph text={d.summary!.role} />
+          </dd>
+        </div>
+        {d.summary!.result && (
+          <div>
+            <dt>Result</dt>
+            <dd>
+              <Ph text={d.summary!.result} />
+            </dd>
+          </div>
+        )}
+        <div>
+          <dt>Stack</dt>
+          <dd class="chips">
+            {d.stack!.map((s) => (
+              <span class="chip">
+                <Ph text={s} />
+              </span>
+            ))}
+          </dd>
+        </div>
+      </dl>
+    ) : (
+      <div class="body">{Content && <Content />}</div>
+    )}
+    {(otherLinks.length > 0 || pendingLinks.length > 0) && (
+      <ul class="links">
+        {otherLinks.map((l) => (
+          <li>
+            <a class="tap" href={assetUrl(l.href)}>
+              {l.label}
+              <span class="visually-hidden">: {d.title}</span>
+            </a>
+          </li>
+        ))}
+        {pendingLinks.map((l) => (
+          <li class="pending">
+            {l.label}: <Ph text={l.href} />
+          </li>
+        ))}
+      </ul>
+    )}
+  </div>
+
+  {cta && (
+    <div class="cta">
+      <a class="cta-link" href={cta.href}>
+        {cta.label}
+        {!full && <span class="visually-hidden">: {d.title}</span>}
+        <svg
+          aria-hidden="true"
+          width="18"
+          height="18"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2.2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        >
+          <path d="M5 12h14M13 6l6 6-6 6" />
+        </svg>
+      </a>
+    </div>
+  )}
+</div>
+
+<style>
+  .np {
+    display: grid;
+    gap: 24px 48px;
+  }
+
+  .label {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 0.8125rem;
+    font-weight: 700;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--accent);
+  }
+
+  .label span {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--accent);
+  }
+
+  .back {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    min-height: var(--tap);
+    padding: 0 4px;
+    border: 0;
+    background: transparent;
+    color: var(--ink);
+    font: inherit;
+    font-size: 0.9375rem;
+    font-weight: 600;
+    cursor: pointer;
+  }
+
+  .back:hover {
+    color: var(--accent);
+  }
+
+  .round {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: var(--tap);
+    height: var(--tap);
+    padding: 0;
+    border: 0;
+    border-radius: 50%;
+    background: #e6ddcd;
+    color: var(--ink);
+    cursor: pointer;
+  }
+
+  .pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    min-height: var(--tap);
+    padding: 0 18px;
+    border: 1.5px solid var(--ink);
+    border-radius: var(--radius-pill);
+    background: transparent;
+    color: var(--ink);
+    font: inherit;
+    font-size: 0.875rem;
+    font-weight: 600;
+    cursor: pointer;
+  }
+
+  .pause .icon-play,
+  .pause[aria-pressed='true'] .icon-pause {
+    display: none;
+  }
+
+  .pause[aria-pressed='true'] .icon-play {
+    display: inline;
+  }
+
+  .titles {
+    container-type: inline-size;
+  }
+
+  .title {
+    font-size: min(clamp(3rem, 7vw, 6.5rem), var(--title-fit));
+    line-height: 0.85;
+    font-weight: 900;
+  }
+
+  /* Focus lands here when a record opens; it's a landmark, not a control. */
+  .title:focus {
+    outline: none;
+  }
+
+  .meta {
+    margin-top: 12px;
+    font-size: 0.875rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    color: var(--muted);
+  }
+
+  .facts {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .facts > div {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding-top: 14px;
+    border-top: 1px solid var(--line);
+  }
+
+  .facts dt {
+    font-size: 0.75rem;
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--accent);
+  }
+
+  .facts dd {
+    font-size: 1rem;
+    line-height: 1.5;
+  }
+
+  .chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 4px;
+  }
+
+  .chip {
+    padding: 5px 11px;
+    border: 1px solid var(--ink);
+    border-radius: var(--radius-pill);
+    font-size: 0.8125rem;
+    font-weight: 600;
+  }
+
+  .body {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding-top: 14px;
+    border-top: 1px solid var(--line);
+    font-size: 1.0625rem;
+    line-height: 1.55;
+  }
+
+  .body :global(a) {
+    font-weight: 600;
+  }
+
+  .links {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 16px;
+    margin-top: 12px;
+    padding: 0;
+    list-style: none;
+    font-weight: 600;
+  }
+
+  .pending {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    min-height: var(--tap);
+    color: var(--muted);
+  }
+
+  .cta-link {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    min-height: 52px;
+    padding: 0 24px;
+    border-radius: var(--radius-pill);
+    background: var(--accent);
+    color: var(--accent-ink);
+    font-weight: 700;
+    text-decoration: none;
+  }
+
+  .cta-link:hover {
+    background: var(--accent-hover);
+    color: var(--accent-ink);
+  }
+
+  /* The mini record (sheet only) spins with the big one */
+  .mini {
+    position: relative;
+    display: grid;
+    place-items: center;
+    flex: 0 0 64px;
+    width: 64px;
+    height: 64px;
+    border-radius: 50%;
+    background: repeating-radial-gradient(circle at center, #141210 0 1.5px, #24201d 1.5px 3px);
+    animation: np-spin 1.8s linear infinite;
+  }
+
+  .np--7in .mini {
+    animation-duration: 1.333s;
+  }
+
+  .mini-label {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background: var(--ground);
+    box-shadow: inset 6px 6px 0 rgba(255, 255, 255, 0.18);
+  }
+
+  :global([data-paused]) .mini {
+    animation-play-state: paused;
+  }
+
+  @keyframes np-spin {
+    to {
+      transform: rotate(360deg);
+    }
+  }
+
+  /* ---------- Panel layout (≥ 900px) ---------- */
+
+  :global(.np-panel) .np {
+    grid-template-columns: minmax(280px, 1fr) minmax(0, 1fr) minmax(300px, 1fr);
+    grid-template-areas:
+      'bar bar bar'
+      'deck stage head'
+      'controls stage summary'
+      '. stage cta';
+    align-items: start;
+  }
+
+  :global(.np-panel) .np--no-stage {
+    grid-template-columns: minmax(280px, 1fr) minmax(0, 2fr);
+    grid-template-areas:
+      'bar bar'
+      'deck head'
+      'controls summary'
+      '. cta';
+  }
+
+  :global(.np-panel) .bar {
+    grid-area: bar;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding-bottom: 20px;
+    margin-bottom: 12px;
+    border-bottom: 2px solid var(--ink);
+  }
+
+  :global(.np-panel) .deck {
+    grid-area: deck;
+  }
+
+  :global(.np-panel) .controls {
+    grid-area: controls;
+  }
+
+  :global(.np-panel) .stage-col {
+    grid-area: stage;
+  }
+
+  .stage-col > :global(.stage) {
+    width: 100%;
+  }
+
+  :global(.np-panel) .head {
+    grid-area: head;
+  }
+
+  :global(.np-panel) .summary {
+    grid-area: summary;
+  }
+
+  :global(.np-panel) .cta {
+    grid-area: cta;
+  }
+
+  :global(.np-panel) .grabber,
+  :global(.np-panel) .mini,
+  :global(.np-panel) .close,
+  :global(.np-panel) .label--sheet {
+    display: none;
+  }
+
+  /* A landscape tablet needs the room: it spans the stage and summary columns. */
+  :global(.np-panel) .np:has(:global(.device--landscape)) {
+    grid-template-areas:
+      'bar bar bar'
+      'deck head head'
+      'deck stage stage'
+      'controls summary summary'
+      '. cta cta';
+  }
+
+  @media (max-width: 1199px) {
+    :global(.np-panel) .np,
+    :global(.np-panel) .np--no-stage,
+    :global(.np-panel) .np:has(:global(.device--landscape)) {
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+      grid-template-areas:
+        'bar bar'
+        'deck head'
+        'controls summary'
+        'stage stage'
+        'cta cta';
+    }
+
+    :global(.np-panel) .np--no-stage {
+      grid-template-areas:
+        'bar bar'
+        'deck head'
+        'controls summary'
+        'cta cta';
+    }
+  }
+
+  /* ---------- Sheet layout (< 900px) ---------- */
+
+  :global(.np-sheet) .np {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 20px;
+    padding: 0 20px 24px;
+  }
+
+  :global(.np-sheet) .bar,
+  :global(.np-sheet) .deck {
+    display: none;
+  }
+
+  :global(.np-sheet) .grabber {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    display: flex;
+    justify-content: center;
+    margin: 0 -20px;
+    padding: 9px 0 6px;
+    background: var(--paper);
+    touch-action: none;
+    cursor: grab;
+  }
+
+  :global(.np-sheet) .grabber span {
+    width: 40px;
+    height: 5px;
+    border-radius: 3px;
+    background: #a89a87;
+  }
+
+  :global(.np-sheet) .head {
+    display: flex;
+    align-items: flex-start;
+    gap: 14px;
+    touch-action: none;
+  }
+
+  :global(.np-sheet) .titles {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+
+  :global(.np-sheet) .label {
+    font-size: 0.6875rem;
+  }
+
+  :global(.np-sheet) .label span {
+    display: none;
+  }
+
+  :global(.np-sheet) .title {
+    margin-top: 2px;
+    font-size: min(2.75rem, var(--title-fit));
+    line-height: 0.9;
+  }
+
+  :global(.np-sheet) .meta {
+    margin-top: 4px;
+    font-size: 0.75rem;
+  }
+
+  :global(.np-sheet) .controls {
+    order: 3;
+    display: flex;
+    justify-content: center;
+  }
+
+  :global(.np-sheet) .stage-col {
+    order: 2;
+    display: flex;
+    justify-content: center;
+  }
+
+  :global(.np-sheet) .stage-col :global(.device--phone) {
+    max-width: 210px;
+  }
+
+  :global(.np-sheet) .summary {
+    order: 4;
+  }
+
+  :global(.np-sheet) .cta {
+    order: 5;
+    position: sticky;
+    bottom: 0;
+    margin: 0 -20px -24px;
+    padding: 14px 20px 22px;
+    background: var(--paper);
+    border-top: 1px solid var(--line);
+  }
+
+  :global(.np-sheet) .cta-link {
+    width: 100%;
+  }
+</style>

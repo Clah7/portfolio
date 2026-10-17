@@ -1,0 +1,269 @@
+---
+import '../styles/tokens.css';
+import '../styles/fonts.css';
+import '../styles/global.css';
+
+import FontFaces from '../components/FontFaces.astro';
+import SkipToProjects from '../components/SkipToProjects.astro';
+import { site } from '../data/site';
+import { isPlaceholder } from '../lib/placeholder-pattern.mjs';
+import { url } from '../lib/url';
+
+interface Props {
+  /** Page title; the site name is appended. Omit on the homepage. */
+  title?: string;
+  description?: string;
+}
+
+const { title, description = site.description } = Astro.props;
+const fullTitle = title ? `${title} · ${site.name}` : `${site.name} · Pick a record`;
+const canonical = new URL(Astro.url.pathname, Astro.site);
+
+/** Site-relative paths go through the base; full URLs pass through. */
+const resolve = (value: string) => (/^https?:\/\//.test(value) ? value : url(value));
+const ogImage =
+  site.ogImage && !isPlaceholder(site.ogImage)
+    ? new URL(resolve(site.ogImage), Astro.site)
+    : undefined;
+const resume = site.resume && !isPlaceholder(site.resume) ? resolve(site.resume) : undefined;
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{fullTitle}</title>
+    <meta name="description" content={description} />
+    <link rel="canonical" href={canonical} />
+    <link rel="icon" type="image/svg+xml" href={url('/favicon.svg')} />
+    <meta name="theme-color" content="#F3EDE2" />
+    <meta name="color-scheme" content="light" />
+    {/* Lets CSS draw JS-only layouts (the crate's box) from first paint */}
+    <script is:inline>
+      document.documentElement.classList.add('js');
+    </script>
+    <FontFaces />
+
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content={site.name} />
+    <meta property="og:title" content={fullTitle} />
+    <meta property="og:description" content={description} />
+    <meta property="og:url" content={canonical} />
+    {ogImage && <meta property="og:image" content={ogImage} />}
+    <meta name="twitter:card" content={ogImage ? 'summary_large_image' : 'summary'} />
+  </head>
+  <body>
+    <header class="site-header page">
+      <a class="home d" href={url('/')}>
+        {site.shortName}
+      </a>
+      <nav aria-label="Primary">
+        <ul>
+          <li>
+            <SkipToProjects />
+          </li>
+          <li>
+            <a class="navlink" href="#about">
+              About
+            </a>
+          </li>
+          <li>
+            <a class="navlink" href="#contact">
+              Contact
+            </a>
+          </li>
+        </ul>
+      </nav>
+    </header>
+
+    <main id="main">
+      <slot />
+    </main>
+
+    <footer class="site-footer">
+      <section id="about" class="page about" aria-labelledby="about-h">
+        <h2 id="about-h" class="d">
+          About
+        </h2>
+        <img
+          class="about-photo"
+          src={url(site.photo.src)}
+          alt={site.photo.alt}
+          width={site.photo.width}
+          height={site.photo.height}
+          loading="lazy"
+          decoding="async"
+        />
+        <div class="about-body">
+          <p class="lede">{site.about}</p>
+          <p>
+            <strong>Off the record:</strong> {site.offTheRecord}
+          </p>
+        </div>
+      </section>
+
+      <section id="contact" class="page contact" aria-labelledby="contact-h">
+        <h2 id="contact-h" class="d">
+          Request a session
+        </h2>
+        <ul>
+          <li>
+            <a class="tap" href={`mailto:${site.contact.email}`}>
+              {site.contact.email}
+            </a>
+          </li>
+          <li>
+            <a class="tap" href={site.contact.linkedin}>
+              LinkedIn
+            </a>
+          </li>
+          <li>
+            <a class="tap" href={site.contact.github}>
+              GitHub
+            </a>
+          </li>
+          {resume && (
+            <li>
+              <a class="resume" href={resume}>
+                Download resume
+              </a>
+            </li>
+          )}
+        </ul>
+      </section>
+    </footer>
+  </body>
+</html>
+
+<style>
+  .site-header {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px 16px;
+    padding-block: 14px;
+  }
+
+  .home {
+    display: inline-flex;
+    align-items: center;
+    min-height: var(--tap);
+    font-size: 1.5rem;
+    letter-spacing: 0.04em;
+    color: var(--ink);
+    text-decoration: none;
+  }
+
+  .site-header ul {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px 8px;
+    padding: 0;
+    list-style: none;
+  }
+
+  .navlink {
+    display: inline-flex;
+    align-items: center;
+    min-height: var(--tap);
+    padding: 0 12px;
+    font-size: 0.9375rem;
+    font-weight: 500;
+    color: var(--ink);
+    text-decoration: none;
+  }
+
+  .navlink:hover {
+    color: var(--accent);
+    text-decoration: underline;
+    text-underline-offset: 4px;
+  }
+
+  .site-footer {
+    margin-top: 48px;
+    border-top: 2px solid var(--ink);
+  }
+
+  .about {
+    display: grid;
+    align-items: start;
+    gap: 24px 48px;
+    padding-block: 56px;
+  }
+
+  @media (min-width: 640px) {
+    .about {
+      grid-template-columns: minmax(0, 240px) minmax(0, 1fr);
+    }
+  }
+
+  .about h2,
+  .contact h2 {
+    font-size: clamp(2.25rem, 5vw, 3.5rem);
+    font-weight: 900;
+  }
+
+  .about h2 {
+    grid-column: 1 / -1;
+  }
+
+  .about-body {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    max-width: 60ch;
+    font-size: 1.0625rem;
+  }
+
+  .lede {
+    font-size: 1.25rem;
+    line-height: 1.45;
+  }
+
+  .about-photo {
+    width: 100%;
+    max-width: 240px;
+    height: auto;
+    box-shadow: var(--shadow-paper);
+  }
+
+  .contact {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    padding-block: 32px 64px;
+    border-top: 1px solid var(--line);
+  }
+
+  .contact ul {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px 16px;
+    padding: 0;
+    list-style: none;
+    font-weight: 600;
+  }
+
+  .resume {
+    display: inline-flex;
+    align-items: center;
+    min-height: 48px;
+    padding: 0 20px;
+    border-radius: var(--radius-pill);
+    background: var(--ink);
+    color: var(--paper);
+    font-weight: 700;
+    text-decoration: none;
+  }
+
+  .resume:hover {
+    background: var(--accent);
+    color: var(--accent-ink);
+  }
+</style>

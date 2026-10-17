@@ -1,0 +1,309 @@
+---
+/**
+ * A record sleeve: original typographic/abstract cover art drawn from the
+ * record's `cover` frontmatter (ground, ink, accents, motif). No real logos.
+ *
+ * - With `href` it renders as a link (the crate, the plain list).
+ * - Without `href` it is decorative and hidden from assistive tech.
+ * `size` is the width of a 12in sleeve in px; a 7in sleeve is 60% of it.
+ */
+import type { RecordEntry } from '../lib/records';
+
+interface Props {
+  record: RecordEntry;
+  href?: string;
+  size?: number;
+  class?: string;
+  /** Extra data-* attributes are passed through to the root element. */
+  [key: `data-${string}`]: string | number | undefined;
+}
+
+const { record, href, size = 300, class: className, ...data } = Astro.props;
+const { title, catalogue, format, cover, depth } = record.data;
+const { ground, ink, accents, motif, caption } = cover;
+
+const is7in = format === '7in';
+const width = Math.round(is7in ? size * 0.6 : size);
+const a1 = accents[0] ?? ink;
+const a2 = accents[1] ?? a1;
+const paper = '#F3EDE2';
+
+/*
+ * Title sizes that fit the sleeve without hover. The crate uses them so each title
+ * clears the sleeve standing in front of it (see Crate.astro):
+ *   --fit-1: the whole title on one line, across the sleeve
+ *   --fit-2: the title balanced over two lines
+ *   --fit-1t: one line, leaving room for the "Now playing" tag (12in)
+ * and everywhere else titles wrap freely, but --fit-w keeps the longest word inside
+ * the space left beside the catalogue number.
+ * CAP is a generous average advance of Big Shoulders Black capitals, in em;
+ * scripts/verify.mjs checks that no crate title overflows.
+ */
+const CAP = 0.56;
+const SPAN = 90; // cqw available between the side margins
+const words = title.split(/\s+/);
+let longestOfTwo = title.length;
+for (let i = 1; i < words.length; i++) {
+  const a = words.slice(0, i).join(' ').length;
+  const b = words.slice(i).join(' ').length;
+  longestOfTwo = Math.min(longestOfTwo, Math.max(a, b));
+}
+const fit1 = SPAN / (title.length * CAP);
+const fit2 = SPAN / (longestOfTwo * CAP);
+const TAGGED = 56; // cqw left for the title beside the "Now playing" tag
+const fit1t = TAGGED / (title.length * CAP);
+const longestWord = Math.max(...words.map((w) => w.length));
+const fitWord = (is7in ? 74 : 64) / (longestWord * CAP);
+/** Too long to share the top line with the catalogue number at crate size. */
+const long = title.length * CAP * 11.5 > SPAN - 24;
+const typeNumber = catalogue.slice(-2);
+
+const Tag = href ? 'a' : 'div';
+// Links are named by their visible text (title + catalogue) plus a hidden
+// suffix, so the accessible name always contains the visible label (WCAG 2.5.3).
+const attrs = href ? { href } : { 'aria-hidden': 'true' as const };
+---
+
+<Tag
+  class:list={['sleeve', is7in && 'sleeve--7in', long && 'sleeve--long', className]}
+  style={`--w:${width}px; --ground:${ground}; --sleeve-ink:${ink}; --fit-1:${fit1.toFixed(2)}cqw; --fit-2:${fit2.toFixed(2)}cqw; --fit-1t:${fit1t.toFixed(2)}cqw; --fit-w:${fitWord.toFixed(2)}cqw`}
+  data-format={format}
+  {...data}
+  {...attrs}
+>
+  <svg class="motif" viewBox="0 0 300 300" aria-hidden="true" focusable="false">
+    {motif === 'rings' && (
+      <g>
+        <circle cx="261" cy="261" r="135" fill={a1} />
+        <circle cx="261" cy="261" r="85" fill={a2} />
+        <circle cx="261" cy="261" r="35" fill={ground} />
+        <circle cx="86" cy="130" r="56" fill="none" stroke={ink} stroke-width="2" />
+      </g>
+    )}
+    {motif === 'documents' && (
+      <g>
+        <rect x="50" y="104" width="108" height="138" fill={a1} />
+        <rect x="77" y="89" width="106" height="136" fill={paper} stroke={ink} stroke-width="2" />
+        <g fill={ink}>
+          <rect x="93" y="111" width="74" height="3" />
+          <rect x="93" y="123" width="52" height="3" />
+          <rect x="93" y="135" width="74" height="3" />
+          <rect x="93" y="147" width="41" height="3" />
+        </g>
+        <rect x="184" y="156" width="54" height="3" fill={ink} />
+        <circle cx="256" cy="158" r="20" fill={ink} />
+      </g>
+    )}
+    {motif === 'lens' && (
+      <g>
+        <circle cx="150" cy="158" r="84" fill={ink} />
+        <path
+          d="M112 196 Q112 120 188 120 Q188 196 112 196 Z"
+          fill={ground}
+          transform="rotate(8 150 158)"
+        />
+        <g fill="none" stroke={ink} stroke-width="3">
+          <path d="M41 85 V59 H67" />
+          <path d="M259 85 V59 H233" />
+          <path d="M41 231 V257 H67" />
+          <path d="M259 231 V257 H233" />
+        </g>
+      </g>
+    )}
+    {motif === 'waveform' && (
+      <g fill="none" stroke-linecap="round" stroke-linejoin="round" stroke-width="3">
+        <polyline points="0,190 22,184 40,192 60,180 82,188 104,178 124,186 140,180" stroke={ink} />
+        <polyline points="140,180 152,104 166,198 176,184" stroke={a1} />
+        <polyline points="176,184 198,178 218,188 240,180 262,186 282,178 300,184" stroke={ink} />
+        <circle cx="152" cy="104" r="7" stroke={a1} stroke-width="2.5" />
+      </g>
+    )}
+    {motif === 'graph' && (
+      <g transform="translate(0 77) scale(1.6667)" fill="none" stroke={ink} stroke-width="1.6">
+        <path d="M30 70 L72 30 L118 52 L150 22 M72 30 L84 88 L118 52 M30 70 L84 88" />
+        <circle cx="30" cy="70" r="6" fill={ink} />
+        <circle cx="72" cy="30" r="6" fill={ink} />
+        <circle cx="118" cy="52" r="6" fill={accents[0] ?? paper} />
+        <circle cx="150" cy="22" r="6" fill={ink} />
+        <circle cx="84" cy="88" r="6" fill={accents[0] ?? paper} />
+      </g>
+    )}
+    {motif === 'grid' && (
+      <g fill="none" stroke={ink} stroke-width="2">
+        {[0, 1, 2, 3, 4].flatMap((c) =>
+          [0, 1, 2, 3].map((r) => (
+            <rect
+              x={46 + c * 44}
+              y={100 + r * 44}
+              width="34"
+              height="34"
+              fill={(c + r * 2) % 7 === 3 ? ink : 'none'}
+            />
+          )),
+        )}
+      </g>
+    )}
+    {motif === 'steps' && (
+      <g>
+        <path d="M24 280 H84 V236 H144 V192 H204 V148 H264 V280 Z" fill={ink} />
+        <circle cx="234" cy="122" r="14" fill="none" stroke={ink} stroke-width="3" />
+      </g>
+    )}
+    {motif === 'type' && (
+      <g>
+        <rect x="14" y="214" width="120" height="3" fill={ink} />
+        <text
+          class="type-num"
+          x="292"
+          y="268"
+          text-anchor="end"
+          fill="none"
+          stroke={ink}
+          stroke-width="2"
+        >
+          {typeNumber}
+        </text>
+      </g>
+    )}
+  </svg>
+
+  <span class="head">
+    <span class="title">{title}</span>
+    {is7in ? (
+      <span class="cat">
+        <span aria-hidden="true">7″</span>
+        <span class="cat-num"> · {catalogue}</span>
+      </span>
+    ) : (
+      <span class="cat">{catalogue}</span>
+    )}
+  </span>
+  {/* The number moves to the foot when the corner has no room: small 7in sleeves, and
+      long titles in the crate (see Crate.astro). Exactly one of the two is displayed. */}
+  <span class="cat cat--foot">{catalogue}</span>
+  {caption && (
+    <span class="caption" aria-hidden="true">
+      {caption}
+    </span>
+  )}
+  {href && (
+    <span class="visually-hidden">
+      {is7in ? ', 7-inch single' : ''}.{' '}
+      {depth === 'full' ? 'Read the liner notes' : 'See it in the list'}
+    </span>
+  )}
+</Tag>
+
+<style>
+  .sleeve {
+    position: relative;
+    display: block;
+    flex: 0 0 auto;
+    width: var(--w);
+    max-width: 100%;
+    aspect-ratio: 1;
+    overflow: hidden;
+    container-type: inline-size;
+    background: var(--ground);
+    color: var(--sleeve-ink);
+    text-decoration: none;
+    box-shadow: var(--shadow-sleeve);
+  }
+
+  /* Keep the cover's own ink on hover (global a:hover would recolour it).
+     Lift/tilt motion belongs to the context, e.g. the crate. */
+  a.sleeve:hover {
+    color: var(--sleeve-ink);
+  }
+
+  .motif {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+  }
+
+  .head {
+    position: absolute;
+    inset: 1.7cqw 4.7cqw auto;
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 3cqw;
+  }
+
+  .title {
+    font-family: var(--font-display);
+    font-size: min(13.4cqw, var(--fit-w));
+    font-weight: 900;
+    line-height: 1;
+    text-transform: uppercase;
+  }
+
+  .cat,
+  .caption {
+    font-size: max(10px, 3.7cqw);
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    white-space: nowrap;
+  }
+
+  .caption {
+    position: absolute;
+    left: 4.7cqw;
+    bottom: 4cqw;
+    max-width: 44cqw;
+    white-space: normal;
+    line-height: 1.4;
+    letter-spacing: 0.14em;
+  }
+
+  .cat-num {
+    display: none;
+  }
+
+  @container (min-width: 160px) {
+    .cat-num {
+      display: inline;
+    }
+
+    .sleeve--7in .cat {
+      letter-spacing: 0.06em;
+    }
+
+    .cat--foot {
+      display: none;
+    }
+  }
+
+  .sleeve:not(.sleeve--7in) .cat--foot {
+    display: none;
+  }
+
+  .cat--foot {
+    position: absolute;
+    right: 5.5cqw;
+    bottom: 4cqw;
+  }
+
+  .sleeve--7in .head {
+    inset: 2.2cqw 4.5cqw auto;
+    gap: 2cqw;
+  }
+
+  .sleeve--7in .title {
+    font-size: min(17.8cqw, var(--fit-w));
+  }
+
+  .sleeve--7in .cat,
+  .sleeve--7in .caption {
+    font-size: max(10px, 5.6cqw);
+    font-weight: 700;
+  }
+
+  .type-num {
+    font-family: var(--font-display);
+    font-size: 150px;
+    font-weight: 900;
+  }
+</style>

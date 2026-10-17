@@ -1,0 +1,714 @@
+---
+/**
+ * The record crate, split into sections by divider cards (Projects, Experience,
+ * Community, Honors). One set of sleeve links, three layouts:
+ *
+ * - No JS: every section renders as a headed row of sleeve links.
+ * - JS, < 900px: the dividers become a row of chips (a real tablist) above a
+ *   scroll-snapped row of the active section's sleeves on a kraft ledge.
+ * - JS, ≥ 900px: an open cardboard box drawn in DOM/CSS (docs/design/Main.dc.html).
+ *   Divider boards stand at the back with their tabs staggered along the top;
+ *   the active section's 12in sleeves stand stepped in front of it, each title
+ *   clearing the sleeve in front, and its 7in singles lean against the front wall.
+ *   Coordinates are the mockup's 780×690 artboard, scaled with --s.
+ *
+ * Layout switches on the `.js` class (set in Base.astro's head) so the box is
+ * drawn from first paint. crate.ts adds the tab and sleeve keyboard behaviour,
+ * `?crate=` deep links, live announcements and the `record:play` event.
+ */
+import Sleeve from '../Sleeve.astro';
+import { site } from '../../data/site';
+import { recordHref, recordSlug, type RecordEntry, type Section } from '../../lib/records';
+
+interface Props {
+  sections: { id: Section; label: string; records: RecordEntry[] }[];
+}
+
+const { sections } = Astro.props;
+
+// 12in sleeves step back and up 44 units each, slightly fanned around the box's
+// centre line (x 390); positions repeat past four.
+const LEFTS = [226, 254, 212, 268];
+const TILTS = [-1.2, 1.4, -2.2, 2];
+// The mockup's composition (Main.dc.html), used when a stack of 12in sleeves has
+// exactly one single: the stack sits left of centre and the single leans on the right.
+const MOCKUP_LEFTS = [150, 178, 136, 192];
+const MOCKUP_SINGLE = { x: 478, y: 286, rot: 5, z: 24, size: 180 };
+// 7in singles lean on the front wall in rows of up to three; later rows stand behind,
+// stepped up far enough to show a two-line title (more when there are no 12in sleeves).
+const SINGLE_TILTS = [-2.4, 1.6, -1.2, 2.2, -1.8, 1.2];
+const ROW = 3;
+
+function layout(records: RecordEntry[]) {
+  const singles = records.filter((r) => r.data.format === '7in');
+  const leanRight = singles.length === 1 && singles.length < records.length;
+  const lefts = leanRight ? MOCKUP_LEFTS : LEFTS;
+  const rowStep = singles.length === records.length ? 90 : 66;
+  let twelve = 0;
+  let seven = 0;
+  return records.map((record) => {
+    if (record.data.format === '7in') {
+      if (leanRight) return { record, ...MOCKUP_SINGLE };
+      const n = seven++;
+      const row = Math.floor(n / ROW);
+      const inRow = Math.min(ROW, singles.length - row * ROW);
+      const col = n % ROW;
+      // Spread each row evenly across the box interior (x 120–660).
+      const centre = 120 + ((col + 0.5) * 540) / inRow;
+      return {
+        record,
+        x: centre - 90,
+        y: 312 - row * rowStep,
+        rot: SINGLE_TILTS[n % SINGLE_TILTS.length],
+        z: 24 - row * 4,
+        size: 180,
+      };
+    }
+    const n = twelve++;
+    return {
+      record,
+      x: lefts[n % lefts.length],
+      y: 250 - n * 44,
+      rot: TILTS[n % TILTS.length],
+      z: 12 - n,
+      size: 300,
+    };
+  });
+}
+---
+
+<div class="crate" data-crate>
+  <div class="stage">
+    <div class="box-part shadow" aria-hidden="true"></div>
+    <div class="box-part back-flap" aria-hidden="true"></div>
+    <div class="box-part flap flap--left" aria-hidden="true"></div>
+    <div class="box-part flap flap--right" aria-hidden="true"></div>
+    <div class="box-part interior" aria-hidden="true"></div>
+
+    {/* Divider boards: decoration. Their tabs are the buttons below. */}
+    {sections.map((s, i) => (
+      <div
+        class="box-part divider"
+        data-divider={s.id}
+        data-active={i === 0 ? '' : undefined}
+        aria-hidden="true"
+      />
+    ))}
+
+    <div class="tabs" role="tablist" aria-label="Crate sections" data-crate-tabs>
+      {sections.map((s, i) => (
+        <button
+          type="button"
+          class="tab d"
+          role="tab"
+          id={`crate-tab-${s.id}`}
+          aria-selected={i === 0 ? 'true' : 'false'}
+          aria-controls={`crate-panel-${s.id}`}
+          tabindex={i === 0 ? 0 : -1}
+          data-section={s.id}
+          data-label={s.label}
+          data-count={s.records.length}
+          style={`--i:${i}`}
+        >
+          {s.label}
+          <span class="count">{s.records.length}</span>
+          <span class="visually-hidden">records</span>
+        </button>
+      ))}
+    </div>
+
+    {sections.map((s, i) => (
+      <section
+        class="panel"
+        id={`crate-panel-${s.id}`}
+        aria-labelledby={`crate-h-${s.id}`}
+        data-crate-panel={s.id}
+        data-active={i === 0 ? '' : undefined}
+      >
+        <h2 class="panel-h d" id={`crate-h-${s.id}`}>
+          {s.label} <span class="count">{s.records.length}</span>
+        </h2>
+        <div class="sleeves">
+          {layout(s.records).map(({ record, x, y, rot, z, size }, k) => (
+            <div
+              class="slot"
+              style={`--x:${x}; --y:${y}; --rot:${rot}deg; --z:${z}; --size:${size}; --k:${k}`}
+            >
+              <Sleeve
+                record={record}
+                href={recordHref(record)}
+                size={230}
+                data-slug={recordSlug(record)}
+                data-depth={record.data.depth}
+                data-catalogue={record.data.catalogue}
+                data-title={record.data.title}
+              />
+            </div>
+          ))}
+        </div>
+      </section>
+    ))}
+
+    <div class="box-front">
+      <span class="box-part hand-hole" aria-hidden="true"></span>
+      <p class="label">
+        <span class="tape" aria-hidden="true"></span>
+        <span class="box-label">
+          <span class="line">{site.boxLabel.line1}</span>{' '}
+          <span class="line">{site.boxLabel.line2}</span>
+        </span>
+      </p>
+    </div>
+  </div>
+
+  <p class="visually-hidden" aria-live="polite" data-crate-status></p>
+</div>
+
+<script>
+  import { initCrate } from './crate';
+
+  document.querySelectorAll<HTMLElement>('[data-crate]').forEach(initCrate);
+</script>
+
+<style>
+  .crate {
+    /* Box and divider colours from the mockup; they only live here */
+    --box-back: #c99a63;
+    --box-flap-left: #bf8d57;
+    --box-flap-right: #a9773f;
+    --box-inside: #4a321b;
+    --box-hole: #3e2a16;
+    --box-hole-shadow: #23170b;
+    --box-back-shadow: #a97a45;
+    --board: #dcbc8c; /* the active divider, stiff and a little paler than the box */
+    --board-back: var(--kraft); /* dividers further back (ink on it passes AA) */
+    --board-edge: #b48a55;
+
+    position: relative;
+  }
+
+  /* ---------- Shared: sleeve rows (no JS, and mobile) ---------- */
+
+  .box-part,
+  .tabs {
+    display: none;
+  }
+
+  .panel + .panel {
+    margin-top: 28px;
+  }
+
+  .panel-h {
+    padding-inline: var(--gutter);
+    font-size: 1.75rem;
+    line-height: 1;
+  }
+
+  .panel-h .count {
+    font-size: 1rem;
+    color: var(--muted);
+    vertical-align: super;
+  }
+
+  .sleeves {
+    position: relative;
+    display: flex;
+    align-items: flex-end;
+    gap: 16px;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    scroll-padding-inline: var(--gutter);
+    padding: 24px var(--gutter) 0;
+    scrollbar-width: none;
+  }
+
+  .sleeves::-webkit-scrollbar {
+    display: none;
+  }
+
+  .slot {
+    flex: 0 0 auto;
+    scroll-snap-align: start;
+  }
+
+  .slot:last-child {
+    margin-right: var(--gutter);
+  }
+
+  .slot :global(.sleeve) {
+    transition:
+      transform var(--duration) var(--ease-out),
+      box-shadow var(--duration) var(--ease-out);
+  }
+
+  .slot :global(.sleeve:hover),
+  .slot :global(.sleeve:focus-visible) {
+    transform: translateY(-10px);
+    box-shadow: var(--shadow-lift);
+  }
+
+  /* The record that's playing (Now Playing sets aria-current): pulled up and
+     tagged. The tag's alt text is empty, so it isn't added to the link name;
+     screen readers hear "current" from aria-current instead. */
+  .slot :global(.sleeve[aria-current='true']) {
+    transform: translateY(-14px);
+    box-shadow: var(--shadow-lift);
+  }
+
+  .slot :global(.sleeve[aria-current='true'])::after {
+    content: 'Now playing';
+    content: 'Now playing' / '';
+    position: absolute;
+    left: 4.7cqw;
+    top: 46%;
+    padding: 1.6cqw 3cqw;
+    background: var(--accent);
+    color: var(--accent-ink);
+    font-size: max(10px, 4.2cqw);
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+
+  .box-front {
+    position: relative;
+    margin: -8px var(--gutter) 0;
+    min-height: 96px;
+    padding: 26px 24px 20px;
+    background: var(--kraft);
+    box-shadow:
+      inset 0 7px 0 var(--kraft-light),
+      inset 0 -3px 0 var(--kraft-dark),
+      var(--shadow-box);
+    pointer-events: none;
+  }
+
+  .label {
+    position: relative;
+    display: inline-block;
+    max-width: 100%;
+    padding: 10px 18px;
+    background: var(--label-paper);
+    color: var(--ink);
+    font-size: clamp(1.0625rem, 2.2vw, 1.5rem);
+    line-height: 1.2;
+    transform: rotate(-1.5deg);
+    box-shadow: var(--shadow-paper);
+  }
+
+  .line {
+    white-space: nowrap;
+  }
+
+  .tape {
+    position: absolute;
+    left: 40%;
+    top: -10px;
+    width: 34%;
+    min-width: 70px;
+    height: 20px;
+    background: var(--tape);
+    transform: rotate(3deg);
+  }
+
+  /* ---------- JS: one section at a time ---------- */
+
+  :global(.js) .panel:not([data-active]) {
+    display: none;
+  }
+
+  :global(.js) .panel + .panel {
+    margin-top: 0;
+  }
+
+  :global(.js) .panel-h {
+    display: none;
+  }
+
+  /* Section switch: the incoming sleeves rise out of the box */
+  @keyframes rise {
+    from {
+      opacity: 0;
+      transform: translateY(60px);
+    }
+  }
+
+  :global(.js) .panel[data-flip] .slot {
+    animation: rise calc(var(--duration) * 1.4) var(--ease-out) both;
+    animation-delay: calc(var(--k) * 35ms * var(--motion));
+  }
+
+  /* ---------- JS, mobile (< 900px): chips above the row ---------- */
+
+  :global(.js) .tabs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 0 var(--gutter);
+  }
+
+  .tab {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    min-height: var(--tap);
+    padding: 0 16px;
+    border: 1.5px solid var(--ink);
+    border-radius: var(--radius-pill);
+    background: transparent;
+    color: var(--ink);
+    font-size: 1.125rem;
+    font-weight: 800;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    cursor: pointer;
+  }
+
+  .tab .count {
+    font-family: var(--font-body);
+    font-size: 0.75rem;
+    font-weight: 700;
+    letter-spacing: 0;
+  }
+
+  .tab[aria-selected='true'] {
+    background: var(--ink);
+    color: var(--paper);
+  }
+
+  .tab:not([aria-selected='true']):hover {
+    background: var(--paper-raised);
+  }
+
+  /* ---------- JS, desktop (≥ 900px): the open box ---------- */
+
+  @media (min-width: 900px) {
+    :global(.js) .stage {
+      position: relative;
+      width: min(780px, 100%);
+      margin-inline: auto;
+      aspect-ratio: 780 / 690;
+      container-type: inline-size;
+      /* 1 mockup px, scaled to the stage width */
+      --s: calc(100cqw / 780);
+    }
+
+    :global(.js) .box-part {
+      display: block;
+      position: absolute;
+    }
+
+    .shadow {
+      left: calc(50 * var(--s));
+      top: calc(616 * var(--s));
+      width: calc(700 * var(--s));
+      height: calc(60 * var(--s));
+      border-radius: 50%;
+      background: rgba(70, 45, 20, 0.22);
+      filter: blur(calc(14 * var(--s)));
+    }
+
+    .back-flap {
+      left: calc(120 * var(--s));
+      top: calc(228 * var(--s));
+      width: calc(540 * var(--s));
+      height: calc(74 * var(--s));
+      background: var(--box-back);
+      clip-path: polygon(5% 0, 95% 0, 100% 100%, 0 100%);
+      box-shadow: inset 0 calc(-6 * var(--s)) 0 var(--box-back-shadow);
+    }
+
+    .flap {
+      top: calc(250 * var(--s));
+      width: calc(140 * var(--s));
+      height: calc(160 * var(--s));
+    }
+
+    .flap--left {
+      left: 0;
+      background: var(--box-flap-left);
+      clip-path: polygon(85.7% 31.3%, 57.1% 93.8%, 10% 76.3%, 32.9% 10%);
+    }
+
+    .flap--right {
+      left: calc(640 * var(--s));
+      background: var(--box-flap-right);
+      clip-path: polygon(14.3% 31.3%, 42.9% 93.8%, 90% 76.3%, 67.1% 10%);
+    }
+
+    .interior {
+      left: calc(80 * var(--s));
+      top: calc(300 * var(--s));
+      width: calc(620 * var(--s));
+      height: calc(100 * var(--s));
+      background: var(--box-inside);
+      clip-path: polygon(6.45% 0, 93.55% 0, 100% 100%, 0 100%);
+    }
+
+    /* Divider boards: slightly taller than a 12in sleeve, standing at the back.
+       The active one comes forward; the rest wait behind it. */
+    .divider {
+      left: calc(140 * var(--s));
+      top: calc(84 * var(--s));
+      z-index: 1;
+      width: calc(500 * var(--s));
+      height: calc(330 * var(--s));
+      border-radius: calc(3 * var(--s)) calc(3 * var(--s)) 0 0;
+      background: var(--board-back);
+      box-shadow:
+        inset 0 calc(-114 * var(--s)) 0 rgba(40, 25, 10, 0.55),
+        0 calc(-2 * var(--s)) 0 var(--board-edge);
+    }
+
+    .divider[data-active] {
+      z-index: 2;
+      background: var(--board);
+    }
+
+    .divider[data-flip] {
+      animation: board-forward calc(var(--duration) * 1.2) var(--ease-out) both;
+    }
+
+    @keyframes board-forward {
+      from {
+        transform: translateY(calc(-14 * var(--s)));
+        filter: brightness(0.86);
+      }
+    }
+
+    /* The tabs sit along the top edge of the boards, staggered left to right */
+    :global(.js) .tabs {
+      position: absolute;
+      left: calc(140 * var(--s));
+      top: calc(84 * var(--s));
+      z-index: 6;
+      display: block;
+      width: calc(500 * var(--s));
+      height: 0;
+      padding: 0;
+    }
+
+    .tab {
+      position: absolute;
+      bottom: 0;
+      left: calc(var(--i) * 125 * var(--s));
+      justify-content: center;
+      gap: calc(6 * var(--s));
+      width: calc(125 * var(--s));
+      height: max(var(--tap), calc(46 * var(--s)));
+      min-height: 0;
+      padding: 0 calc(8 * var(--s));
+      border: 0;
+      border-radius: calc(10 * var(--s)) calc(10 * var(--s)) 0 0;
+      background: var(--board-back);
+      color: var(--ink);
+      font-size: calc(19 * var(--s));
+      white-space: nowrap;
+      box-shadow: inset 0 calc(2 * var(--s)) 0 var(--board-edge);
+    }
+
+    .tab .count {
+      font-size: calc(12 * var(--s));
+    }
+
+    .tab:not([aria-selected='true']):hover {
+      background: var(--kraft-light);
+    }
+
+    .tab[aria-selected='true'] {
+      z-index: 1;
+      background: var(--board);
+      color: var(--ink);
+    }
+
+    .tab:focus-visible {
+      z-index: 2;
+    }
+
+    /* Each section's sleeves stack against the box parts. The layers span the
+       stage, so only the sleeves themselves take the pointer. */
+    :global(.js) .panel {
+      position: absolute;
+      inset: 0;
+      z-index: 5;
+      pointer-events: none;
+    }
+
+    :global(.js) .sleeves {
+      position: absolute;
+      inset: 0;
+      display: block;
+      overflow: visible;
+      padding: 0;
+    }
+
+    :global(.js) .slot {
+      pointer-events: auto;
+    }
+
+    :global(.js) .slot {
+      position: absolute;
+      left: calc(var(--x) * var(--s));
+      top: calc(var(--y) * var(--s));
+      z-index: var(--z);
+      width: calc(var(--size) * var(--s));
+      margin: 0;
+      transform: rotate(var(--rot));
+      perspective: 900px;
+    }
+
+    :global(.js) .panel[data-flip] .slot {
+      animation-name: rise-box;
+    }
+
+    @keyframes rise-box {
+      from {
+        opacity: 0;
+        transform: rotate(var(--rot)) translateY(calc(140 * var(--s)));
+      }
+    }
+
+    :global(.js) .slot :global(.sleeve) {
+      width: 100%;
+      transform-origin: 50% 100%;
+    }
+
+    /* Titles fit on the band each sleeve shows above the one in front:
+       12in on one line, 7in balanced over two (sizes from Sleeve.astro). */
+    :global(.js) .slot :global(.sleeve:not(.sleeve--7in) .title) {
+      font-size: min(11.5cqw, var(--fit-1));
+      white-space: nowrap;
+    }
+
+    :global(.js) .slot :global(.sleeve--7in .title) {
+      font-size: min(15.5cqw, var(--fit-2));
+      text-wrap: balance;
+    }
+
+    /* No room for the number in the corner: it moves to the foot */
+    :global(.js) .slot :global(.sleeve--7in .head > .cat),
+    :global(.js) .slot :global(.sleeve--long .head > .cat) {
+      display: none;
+    }
+
+    :global(.js) .slot :global(.sleeve--7in .cat--foot),
+    :global(.js) .slot :global(.sleeve--long .cat--foot) {
+      display: block;
+    }
+
+    /* Keyboard focus brings the sleeve in front of its neighbours (still
+       behind the box's front wall) so the whole focus ring is visible. */
+    :global(.js) .slot:has(:global(.sleeve:focus-visible)) {
+      z-index: 30;
+    }
+
+    /* Pull the sleeve up out of the box and tip it towards the viewer */
+    :global(.js) .slot :global(.sleeve:hover),
+    :global(.js) .slot :global(.sleeve:focus-visible) {
+      transform: translateY(calc(-34 * var(--s))) rotateX(-9deg);
+    }
+
+    /* Playing: lifted a little (not so far that it hides the titles behind
+       it, so visitors can still pick the next record), with the tag in the
+       title row where the catalogue number was. */
+    :global(.js) .slot :global(.sleeve[aria-current='true']) {
+      transform: translateY(calc(-6 * var(--s)));
+    }
+
+    :global(.js) .slot :global(.sleeve[aria-current='true'])::after {
+      top: 2.2cqw;
+      right: 4.5cqw;
+      left: auto;
+      padding: 1cqw 2cqw;
+      font-size: max(9px, 3.3cqw);
+      letter-spacing: 0.08em;
+    }
+
+    :global(.js) .slot :global(.sleeve[aria-current='true'] .head > .cat) {
+      display: none;
+    }
+
+    :global(.js) .slot :global(.sleeve[aria-current='true'] .cat--foot) {
+      display: block;
+    }
+
+    :global(.js) .slot :global(.sleeve[aria-current='true'] .head) {
+      right: auto;
+    }
+
+    :global(.js) .slot :global(.sleeve:not(.sleeve--7in)[aria-current='true'] .title) {
+      font-size: min(11.5cqw, var(--fit-1t));
+    }
+
+    /* A 7in sleeve is too small for the tag beside a two-line title: the tag
+       sits above it, and the sleeve lifts by the tag's height so the title
+       stays exactly where it was. */
+    :global(.js) .slot :global(.sleeve--7in[aria-current='true']) {
+      transform: translateY(calc(-23 * var(--s)));
+    }
+
+    :global(.js) .slot :global(.sleeve--7in[aria-current='true'])::after {
+      left: 4.5cqw;
+      right: auto;
+    }
+
+    :global(.js) .slot :global(.sleeve--7in[aria-current='true'] .head) {
+      top: 13cqw;
+    }
+
+    :global(.js) .box-front {
+      position: absolute;
+      left: calc(80 * var(--s));
+      top: calc(400 * var(--s));
+      z-index: 40;
+      width: calc(620 * var(--s));
+      height: calc(250 * var(--s));
+      min-height: 0;
+      margin: 0;
+      padding: 0;
+      box-shadow:
+        inset 0 calc(7 * var(--s)) 0 var(--kraft-light),
+        inset 0 calc(-3 * var(--s)) 0 var(--kraft-dark),
+        var(--shadow-box);
+    }
+
+    .hand-hole {
+      left: calc(260 * var(--s));
+      top: calc(30 * var(--s));
+      width: calc(100 * var(--s));
+      height: calc(26 * var(--s));
+      border-radius: calc(13 * var(--s));
+      background: var(--box-hole);
+      box-shadow: inset 0 calc(3 * var(--s)) 0 var(--box-hole-shadow);
+    }
+
+    :global(.js) .label {
+      position: absolute;
+      left: calc(150 * var(--s));
+      top: calc(94 * var(--s));
+      width: calc(320 * var(--s));
+      padding: calc(18 * var(--s)) calc(22 * var(--s)) calc(16 * var(--s));
+      font-size: calc(28 * var(--s));
+      line-height: 1.15;
+      transform: rotate(-2deg);
+    }
+
+    :global(.js) .line {
+      display: block;
+    }
+
+    :global(.js) .line:first-child {
+      white-space: normal;
+    }
+
+    :global(.js) .tape {
+      left: calc(100 * var(--s));
+      top: calc(-14 * var(--s));
+      width: calc(130 * var(--s));
+      min-width: 0;
+      height: calc(30 * var(--s));
+      box-shadow: inset 0 0 0 1px rgba(160, 120, 60, 0.25);
+    }
+  }
+</style>

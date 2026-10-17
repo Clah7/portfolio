@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Now Playing — Baur (mobile)</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders:wght@600;700;800;900&amp;family=Schibsted+Grotesk:ital,wght@0,400;0,500;0,600;0,700;1,400&amp;display=swap">
+<style>
+body{margin:0;background:#F3EDE2}
+a{color:#7B2622}a:hover{color:#561814}
+.d{font-family:'Big Shoulders','Avenir Next Condensed',sans-serif}
+.ph{background:#E9DCC3;color:#5A3A1A;padding:1px 6px;border-radius:3px;font-weight:600;font-size:.9em}
+a:focus-visible,button:focus-visible{outline:3px solid #7B2622;outline-offset:3px}
+.spin{animation:dcl-spin 1.8s linear infinite}
+@keyframes dcl-spin{to{transform:rotate(360deg)}}
+@media (prefers-reduced-motion: reduce){.spin{animation:none}}
+</style>
+</helmet>
+<div style="position: relative; width: 390px; height: 844px; overflow: hidden; background: #F3EDE2; color: #1B1714; font-family: 'Schibsted Grotesk', 'Helvetica Neue', sans-serif">
+
+<div aria-hidden="true" style="padding: 10px 20px 0">
+<div class="d" style="height: 54px; display: flex; align-items: center; font-size: 20px; font-weight: 800; letter-spacing: 0.04em; text-transform: uppercase">Darren C. Liharja</div>
+<div class="d" style="margin-top: 14px; font-size: 66px; line-height: 0.84; font-weight: 900; text-transform: uppercase">Darren Christian</div>
+</div>
+<div aria-hidden="true" style="position: absolute; inset: 0; background: rgba(27,23,20,0.58)"></div>
+
+<section role="dialog" aria-modal="true" aria-labelledby="sheet-title" style="position: absolute; left: 0; right: 0; top: 76px; bottom: 0; background: #F3EDE2; border-radius: 22px 22px 0 0; box-shadow: 0 -10px 30px rgba(27,23,20,0.3); overflow: hidden">
+
+<div aria-hidden="true" style="width: 40px; height: 5px; border-radius: 3px; background: #A89A87; margin: 9px auto 0"></div>
+
+<div style="height: 100%; overflow-y: auto; padding: 8px 20px 120px; box-sizing: border-box">
+
+<div style="display: flex; align-items: center; gap: 14px">
+<div style="position: relative; flex: 0 0 64px; height: 64px">
+<div class="spin" role="img" aria-label="Record DCL-001 Baur spinning" style="width: 64px; height: 64px; border-radius: 50%; background: repeating-radial-gradient(circle at center, #141210 0 1.5px, #24201D 1.5px 3px); display: flex; align-items: center; justify-content: center">
+<div style="position: relative; width: 24px; height: 24px; border-radius: 50%; background: #1E4D4F; overflow: hidden">
+<div style="position: absolute; left: 12px; top: 12px; width: 16px; height: 16px; border-radius: 50%; background: #D9A23A"></div>
+</div>
+</div>
+</div>
+<div style="flex: 1 1 auto; min-width: 0">
+<p style="margin: 0; font-size: 11px; font-weight: 700; letter-spacing: 0.16em; text-transform: uppercase; color: #7B2622">Now playing · Side A</p>
+<h2 id="sheet-title" class="d" style="margin: 2px 0 0; font-size: 44px; line-height: 0.9; font-weight: 900; text-transform: uppercase">Baur</h2>
+<p style="margin: 3px 0 0; font-size: 12px; font-weight: 600; color: #5A5048">DCL-001 · iOS · Jul–Sep 2026</p>
+</div>
+<a href="MobileHome.dc.html" aria-label="Close Now Playing" style="flex: 0 0 44px; width: 44px; height: 44px; border-radius: 50%; background: #E6DDCD; display: flex; align-items: center; justify-content: center; align-self: flex-start">
+<svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#1B1714" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"></path></svg>
+</a>
+</div>
+
+<div style="display: flex; justify-content: center; align-items: flex-end; gap: 12px; margin-top: 18px; padding-left: 56px">
+<div style="position: relative; width: 186px; height: 384px; border-radius: 36px; background: #1B1714; padding: 8px; box-sizing: border-box; box-shadow: inset 0 0 0 2px #3A3531, 0 22px 30px -20px rgba(40,25,10,0.6)">
+<div role="img" aria-label="Placeholder for the Baur app demo video" style="position: relative; width: 100%; height: 100%; border-radius: 29px; background: #E9E2D4; overflow: hidden; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; padding: 16px; box-sizing: border-box">
+<div aria-hidden="true" style="position: absolute; top: 9px; left: 50%; transform: translateX(-50%); width: 58px; height: 18px; border-radius: 9px; background: #1B1714"></div>
+<div aria-hidden="true" style="position: absolute; inset: 36px 10px 10px; border: 1.5px dashed #8A7F70; border-radius: 20px"></div>
+<span style="position: relative; font-size: 13px; font-weight: 700; text-align: center; line-height: 1.35">[APP DEMO VIDEO — Baur]</span>
+<span style="position: relative; font-size: 11px; text-align: center; color: #5A5048">Muted, loops</span>
+</div>
+</div>
+<button type="button" aria-label="Pause demo" style="width: 44px; height: 44px; border-radius: 50%; border: 1.5px solid #1B1714; background: transparent; display: flex; align-items: center; justify-content: center; padding: 0; cursor: pointer">
+<svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#1B1714" stroke-width="2.4" stroke-linecap="round"><path d="M8 5v14M16 5v14"></path></svg>
+</button>
+</div>
+
+<dl style="margin: 22px 0 0; display: flex; flex-direction: column; gap: 14px">
+<div style="padding-top: 12px; border-top: 1px solid #CFC4B2">
+<dt style="font-size: 11px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; color: #7B2622">The problem</dt>
+<dd style="margin: 4px 0 0; font-size: 15px; line-height: 1.5">Young adults navigating unfamiliar cultural norms in Indonesia's regions. <span class="ph">[WHY IT MATTERED]</span></dd>
+</div>
+<div style="padding-top: 12px; border-top: 1px solid #CFC4B2">
+<dt style="font-size: 11px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; color: #7B2622">My role</dt>
+<dd style="margin: 4px 0 0; font-size: 15px; line-height: 1.5">Developer in a team of 10. <span class="ph">[WHAT DARREN BUILT]</span></dd>
+</div>
+<div style="padding-top: 12px; border-top: 1px solid #CFC4B2">
+<dt style="font-size: 11px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; color: #7B2622">What we made</dt>
+<dd style="margin: 4px 0 0; font-size: 15px; line-height: 1.5">Video-based storytelling with gesture interactions and cultural flashcards, shaped by interviews with young adults.</dd>
+</div>
+<div style="padding-top: 12px; border-top: 1px solid #CFC4B2">
+<dt style="font-size: 11px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; color: #7B2622">Result</dt>
+<dd style="margin: 4px 0 0; font-size: 15px; line-height: 1.5"><span class="ph">[RESULT]</span></dd>
+</div>
+<div style="padding-top: 12px; border-top: 1px solid #CFC4B2">
+<dt style="font-size: 11px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; color: #7B2622">Stack</dt>
+<dd style="margin: 8px 0 0; display: flex; flex-wrap: wrap; gap: 6px">
+<span style="font-size: 12px; font-weight: 600; padding: 4px 10px; border: 1px solid #1B1714; border-radius: 999px">SwiftUI</span>
+<span style="font-size: 12px; font-weight: 600; padding: 4px 10px; border: 1px solid #1B1714; border-radius: 999px">SwiftData</span>
+<span style="font-size: 12px; font-weight: 600; padding: 4px 10px; border: 1px solid #1B1714; border-radius: 999px">AVFoundation</span>
+<span style="font-size: 12px; font-weight: 600; padding: 4px 10px; border: 1px solid #1B1714; border-radius: 999px">CoreMotion</span>
+</dd>
+</div>
+</dl>
+</div>
+
+<div style="position: absolute; left: 0; right: 0; bottom: 0; padding: 14px 20px 26px; background: #F3EDE2; border-top: 1px solid #CFC4B2">
+<a href="LinerNotes.dc.html" style="min-height: 52px; display: flex; align-items: center; justify-content: center; gap: 10px; border-radius: 999px; background: #7B2622; color: #F7F1E4; font-size: 16px; font-weight: 700; text-decoration: none">Read the liner notes
+<svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#F7F1E4" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"></path></svg></a>
+</div>
+</section>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return {};
+  }
+}
+</script>
+</body>
+</html>

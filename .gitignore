@@ -1,0 +1,25 @@
+# build output
+dist/
+.astro/
+
+# dependencies
+node_modules/
+
+# logs
+npm-debug.log*
+
+# env
+.env
+.env.*
+
+# macOS
+.DS_Store
+
+# source material (raw PDFs and screenshots, some with personal data);
+# the optimized, redacted copies the site uses live in public/
+docs/source/
+docs/baur/
+docs/earthHunt/
+
+# review screenshots (not part of the site)
+docs/screenshots/

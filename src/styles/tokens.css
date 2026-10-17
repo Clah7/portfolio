@@ -1,0 +1,49 @@
+/* Design tokens. One accent (oxblood); no gradients, glow or neon. */
+:root {
+  --paper: #f3ede2; /* page background (off-white paper) */
+  --paper-raised: #fbf7ef;
+  --ink: #1b1714; /* text */
+  --muted: #5a5048; /* secondary text, AA on --paper */
+  --line: #cfc4b2; /* hairlines */
+  --accent: #7b2622; /* oxblood: the ONE accent */
+  --accent-hover: #561814;
+  --accent-ink: #f7f1e4; /* text on accent */
+  --kraft: #b8864f; /* box */
+  --kraft-light: #d2a06a;
+  --kraft-dark: #9c6d3b;
+  --label-paper: #f7f1e4;
+  --tape: rgba(214, 176, 112, 0.62);
+  --ph-bg: #e9dcc3;
+  --ph-ink: #5a3a1a; /* visible [PLACEHOLDER] chips */
+  --focus: 3px solid var(--accent);
+  --radius-pill: 999px;
+  --tap: 44px; /* minimum touch target */
+
+  /* Soft, warm, realistic shadows only */
+  --shadow-sleeve: 0 1px 0 rgba(0, 0, 0, 0.12), 0 12px 18px -10px rgba(40, 25, 10, 0.55);
+  --shadow-lift: 0 26px 30px -14px rgba(40, 25, 10, 0.55);
+  --shadow-box: 0 34px 40px -24px rgba(50, 30, 10, 0.55);
+  --shadow-paper: 0 2px 4px rgba(50, 30, 10, 0.25);
+
+  /* Type */
+  --font-display: 'Big Shoulders', 'Avenir Next Condensed', sans-serif;
+  --font-body: 'Schibsted Grotesk', 'Helvetica Neue', sans-serif;
+  --font-marker: 'Permanent Marker', 'Marker Felt', cursive;
+  --leading-display: 0.86;
+
+  /* Layout */
+  --page-max: 1312px;
+  --gutter: clamp(16px, 4.5vw, 64px);
+
+  /* Motion: everything animated reads these, so reduced motion is one switch */
+  --motion: 1;
+  --duration: 280ms;
+  --ease-out: cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --motion: 0;
+    --duration: 0ms;
+  }
+}
