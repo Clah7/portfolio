@@ -15,6 +15,7 @@ import Ph from '../Placeholder.astro';
 import Stage from './Stage.astro';
 import CssTurntable from '../Turntable/CssTurntable.astro';
 import { isPlaceholder } from '../../lib/placeholder-pattern.mjs';
+import { shown, visible } from '../../lib/visible';
 import {
   assetUrl,
   hasStage,
@@ -37,10 +38,15 @@ const label = is7in ? 'Single · 45 rpm' : 'Now playing · Side A';
 // The longest word must fit the title column (Big Shoulders caps ≈ 0.56em each).
 const longestWord = Math.max(...d.title.split(/\s+/).map((w) => w.length));
 const titleFit = `${(100 / (longestWord * 0.56)).toFixed(2)}cqw`;
-const meta = [d.role, d.team, d.dates, d.org ?? d.location].filter((v): v is string => Boolean(v));
+const meta = [d.role, d.team, d.dates, d.org ?? d.location].filter(shown);
 
 const links = (d.links ?? []).filter((l) => !isPlaceholder(l.href));
-const pendingLinks = (d.links ?? []).filter((l) => isPlaceholder(l.href));
+// A link without a real URL shows as a chip in dev and is left out of production builds.
+const pendingLinks = visible(
+  (d.links ?? []).filter((l) => isPlaceholder(l.href)),
+  (l) => [l.href],
+);
+const stack = visible(d.stack);
 // The main call to action: liner notes for full records, the first link for cards.
 const cta = full
   ? { label: 'Read the liner notes', href: recordHref(record) }
@@ -167,19 +173,23 @@ const otherLinks = full ? links : links.slice(1);
   <div class="summary">
     {full ? (
       <dl class="facts">
-        <div>
-          <dt>The problem</dt>
-          <dd>
-            <Ph text={d.summary!.problem} />
-          </dd>
-        </div>
-        <div>
-          <dt>My role</dt>
-          <dd>
-            <Ph text={d.summary!.role} />
-          </dd>
-        </div>
-        {d.summary!.result && (
+        {shown(d.summary!.problem) && (
+          <div>
+            <dt>The problem</dt>
+            <dd>
+              <Ph text={d.summary!.problem} />
+            </dd>
+          </div>
+        )}
+        {shown(d.summary!.role) && (
+          <div>
+            <dt>My role</dt>
+            <dd>
+              <Ph text={d.summary!.role} />
+            </dd>
+          </div>
+        )}
+        {shown(d.summary!.result) && (
           <div>
             <dt>Result</dt>
             <dd>
@@ -187,16 +197,18 @@ const otherLinks = full ? links : links.slice(1);
             </dd>
           </div>
         )}
-        <div>
-          <dt>Stack</dt>
-          <dd class="chips">
-            {d.stack!.map((s) => (
-              <span class="chip">
-                <Ph text={s} />
-              </span>
-            ))}
-          </dd>
-        </div>
+        {stack.length > 0 && (
+          <div>
+            <dt>Stack</dt>
+            <dd class="chips">
+              {stack.map((s) => (
+                <span class="chip">
+                  <Ph text={s} />
+                </span>
+              ))}
+            </dd>
+          </div>
+        )}
       </dl>
     ) : (
       <div class="body">{Content && <Content />}</div>

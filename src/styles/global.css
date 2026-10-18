@@ -123,3 +123,97 @@ mark.ph {
   white-space: nowrap;
   border: 0;
 }
+
+/* ---------- Print: a clean, readable liner-notes document ---------- */
+@media print {
+  :root {
+    --paper: #fff;
+    --paper-raised: #fff;
+    --ink: #000;
+    --muted: #222;
+    --line: #999;
+  }
+
+  body {
+    background: #fff;
+    color: #000;
+  }
+
+  /* Navigation and anything interactive or animated */
+  .site-header nav,
+  .skip,
+  .back,
+  .play,
+  .tracklist-wrap,
+  .records-nav,
+  [data-crate],
+  [data-np-panel],
+  [data-np-sheet],
+  .tt3d,
+  .turntable,
+  .gallery-controls,
+  [data-copy-item],
+  .yt-facade {
+    display: none !important;
+  }
+
+  a {
+    color: #000;
+  }
+
+  /* Print where links go */
+  .prose a[href^='http']::after,
+  .contact a[href^='http']::after,
+  .links a[href^='http']::after {
+    content: ' (' attr(href) ')';
+    font-size: 0.85em;
+    font-weight: 400;
+    overflow-wrap: anywhere;
+  }
+
+  h1,
+  h2,
+  h3 {
+    break-after: avoid;
+  }
+
+  .card,
+  .take,
+  figure,
+  .facts > div,
+  .stack li {
+    break-inside: avoid;
+  }
+
+  section.track {
+    padding-block: 24px;
+  }
+
+  /* A smaller stage, so it fits under the cover instead of taking a page of its own */
+  .stage-wrap .device--phone {
+    max-width: 170px !important;
+  }
+
+  .stage-wrap .device--tablet,
+  .stage-wrap .plain,
+  .stage-wrap .photo {
+    max-width: 120mm !important;
+    margin-inline: auto;
+  }
+
+  /* Contact stays together; the resume pill loses its dark fill (backgrounds don't print) */
+  .contact {
+    break-inside: avoid;
+  }
+
+  .contact .resume {
+    background: none !important;
+    color: #000 !important;
+    border: 1.5px solid #000;
+  }
+
+  mark.ph {
+    border: 1px solid #000;
+    background: #fff;
+  }
+}

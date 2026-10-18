@@ -1,0 +1,22 @@
+---
+/**
+ * The Now Playing templates: one inert <template> per published record, as an
+ * HTML fragment (no <head>) that now-playing.ts fetches from the homepage on
+ * the first crate hover/focus, play or deep link. Template content doesn't
+ * load, so no images, video or iframes are fetched until a record plays.
+ * Its styles are already on the homepage (NowPlaying.astro references the
+ * component); partial pages don't carry styles themselves.
+ */
+import NowPlayingRecord from '../components/NowPlaying/NowPlayingRecord.astro';
+import { getRecords, recordSlug } from '../lib/records';
+
+export const partial = true;
+
+const records = await getRecords();
+---
+
+{records.map((record) => (
+  <template data-np={recordSlug(record)} data-section={record.data.section}>
+    <NowPlayingRecord record={record} />
+  </template>
+))}

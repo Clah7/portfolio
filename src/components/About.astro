@@ -1,0 +1,153 @@
+---
+/**
+ * About (homepage, after "All records"): a print-like photo, the name, role
+ * line and bio. All copy lives in src/data/site.ts.
+ */
+import { site } from '../data/site';
+import { resume } from '../lib/resume';
+import { url } from '../lib/url';
+
+const cv = resume();
+---
+
+<section id="about" class="page about" aria-labelledby="about-h">
+  <figure class="print">
+    <img
+      src={url(site.photo.src)}
+      alt={site.photo.alt}
+      width={site.photo.width}
+      height={site.photo.height}
+      loading="lazy"
+      decoding="async"
+    />
+  </figure>
+  <div class="text">
+    <h2 id="about-h" class="eyebrow">
+      About
+    </h2>
+    <p class="name d">{site.name}</p>
+    <p class="role">{site.roleLine}</p>
+    <p class="bio">{site.bio}</p>
+    <ul class="actions">
+      <li>
+        <a class="tap pill pill--solid" href={`${url('/')}?crate=projects#crate`}>
+          See the work
+        </a>
+      </li>
+      <li>
+        <a class="tap pill" href="#contact">
+          Contact
+        </a>
+      </li>
+      {cv && (
+        <li>
+          <a class="tap pill" href={cv.href} download>
+            Resume <span class="size">(PDF, {cv.size})</span>
+          </a>
+        </li>
+      )}
+    </ul>
+  </div>
+</section>
+
+<style>
+  .about {
+    display: grid;
+    gap: 32px 56px;
+    align-items: center;
+    padding-block: 72px 56px;
+    border-top: 2px solid var(--ink);
+  }
+
+  @media (min-width: 760px) {
+    .about {
+      grid-template-columns: minmax(0, 300px) minmax(0, 1fr);
+    }
+  }
+
+  /* A print on the shelf: paper border, a soft shadow, a slight tilt. No filters. */
+  .print {
+    justify-self: center;
+    width: min(100%, 280px);
+    margin: 8px;
+    padding: 12px 12px 34px;
+    background: var(--paper-raised);
+    box-shadow:
+      0 1px 2px rgba(50, 30, 10, 0.18),
+      0 18px 28px -18px rgba(40, 25, 10, 0.55);
+    transform: rotate(-2deg);
+  }
+
+  .print img {
+    display: block;
+    width: 100%;
+    height: auto;
+  }
+
+  .text {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    max-width: 62ch;
+  }
+
+  .eyebrow {
+    color: var(--accent);
+  }
+
+  .name {
+    font-size: clamp(2.75rem, 6vw, 4.5rem);
+    font-weight: 900;
+    line-height: 0.9;
+  }
+
+  .role {
+    font-size: 1.25rem;
+    font-weight: 600;
+    line-height: 1.35;
+  }
+
+  .bio {
+    font-size: 1.0625rem;
+    line-height: 1.55;
+  }
+
+  .actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px 12px;
+    margin-top: 6px;
+    padding: 0;
+    list-style: none;
+  }
+
+  .pill {
+    gap: 6px;
+    padding: 0 18px;
+    border: 1.5px solid var(--ink);
+    border-radius: var(--radius-pill);
+    color: var(--ink);
+    font-weight: 600;
+    text-decoration: none;
+  }
+
+  .pill:hover {
+    background: var(--paper-raised);
+    color: var(--ink);
+  }
+
+  .pill--solid {
+    background: var(--ink);
+    color: var(--paper);
+  }
+
+  .pill--solid:hover {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: var(--accent-ink);
+  }
+
+  .size {
+    font-weight: 500;
+  }
+</style>

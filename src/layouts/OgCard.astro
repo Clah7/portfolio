@@ -1,0 +1,55 @@
+---
+/**
+ * A 1200×630 link-preview card. Only `npm run og` (scripts/og.mjs) visits these
+ * pages, screenshotting them into public/og/*.png; they're noindex, left out of
+ * the sitemap and not linked from anywhere.
+ */
+import '../styles/tokens.css';
+import '../styles/fonts.css';
+import '../styles/global.css';
+import FontFaces from '../components/FontFaces.astro';
+
+interface Props {
+  title: string;
+}
+
+const { title } = Astro.props;
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=1200" />
+    <meta name="robots" content="noindex" />
+    <title>{title}</title>
+    <FontFaces />
+  </head>
+  <body>
+    <main class="card">
+      <slot />
+    </main>
+  </body>
+</html>
+
+<style>
+  :global(html),
+  :global(body) {
+    margin: 0;
+    background: var(--paper);
+  }
+
+  .card {
+    position: relative;
+    width: 1200px;
+    height: 630px;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    gap: 64px;
+    padding: 0 80px;
+    box-sizing: border-box;
+    background: var(--paper);
+    color: var(--ink);
+  }
+</style>

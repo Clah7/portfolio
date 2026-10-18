@@ -1,0 +1,77 @@
+---
+/** Link preview for a liner-notes page: the sleeve, then catalogue, title and name. */
+import type { GetStaticPaths } from 'astro';
+import OgCard from '../../layouts/OgCard.astro';
+import Sleeve from '../../components/Sleeve.astro';
+import { site } from '../../data/site';
+import { getRecords, isFull, recordSlug, type FullRecordEntry } from '../../lib/records';
+
+export const getStaticPaths = (async () => {
+  const records = (await getRecords()).filter(isFull);
+  return records.map((record) => ({ params: { slug: recordSlug(record) }, props: { record } }));
+}) satisfies GetStaticPaths;
+
+interface Props {
+  record: FullRecordEntry;
+}
+
+const { record } = Astro.props;
+const d = record.data;
+// A 7in sleeve is drawn at 60% of `size`; scale it up so both fill the left side.
+const size = d.format === '7in' ? 780 : 470;
+---
+
+<OgCard title={`${d.title} · preview`}>
+  <div class="cover">
+    <Sleeve record={record} size={size} />
+  </div>
+  <div class="text">
+    <p class="cat">
+      {d.catalogue}
+      {d.format === '7in' ? ' · 7″ single' : ' · Liner notes'}
+    </p>
+    <p class="title d">{d.title}</p>
+    <p class="name">{site.name}</p>
+  </div>
+</OgCard>
+
+<style>
+  .cover {
+    flex: 0 0 470px;
+  }
+
+  .cover :global(.sleeve) {
+    width: 470px;
+    box-shadow:
+      0 2px 0 rgba(0, 0, 0, 0.1),
+      0 34px 40px -24px rgba(40, 25, 10, 0.6);
+  }
+
+  .text {
+    display: flex;
+    flex-direction: column;
+    gap: 22px;
+    min-width: 0;
+  }
+
+  .cat {
+    font-size: 24px;
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--accent);
+  }
+
+  .title {
+    font-size: 120px;
+    line-height: 0.84;
+    font-weight: 900;
+    overflow-wrap: anywhere;
+  }
+
+  .name {
+    font-size: 30px;
+    font-weight: 600;
+    color: var(--muted);
+  }
+</style>

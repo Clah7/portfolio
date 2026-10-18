@@ -20,6 +20,10 @@ npm-debug.log*
 docs/source/
 docs/baur/
 docs/earthHunt/
+docs/resume/
 
 # review screenshots (not part of the site)
 docs/screenshots/
+
+# generated portfolio PDF (npm run pdf)
+docs/portfolio/

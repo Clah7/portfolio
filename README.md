@@ -23,6 +23,8 @@ npm run dev       # http://localhost:4321/portfolio/
 | `npm run check`   | Type-check (`astro check`), then list any placeholders left                                                                                           |
 | `npm run format`  | Prettier                                                                                                                                              |
 | `npm run verify`  | Browser audit of the last build: axe, Lighthouse, 44px targets, self-hosted fonts, no three.js up front. First run: `npx playwright install chromium` |
+| `npm run og`      | Build, then regenerate the link-preview images in `public/og/` and `apple-touch-icon.png`                                                             |
+| `npm run pdf`     | The condensed portfolio as an A4 PDF in `docs/portfolio/` (not deployed, not committed); rerun after editing records                                  |
 
 The site is served under `/portfolio/` locally too, so it behaves exactly like the GitHub Pages deploy.
 
@@ -95,6 +97,12 @@ The site is fully static, so switching hosts means changing the build target and
 | **Netlify**                                  | Easiest preview deploys, form handling if a contact form is ever added                                                             | Free tier now meters usage; check current limits                                                       |
 | **Vercel**                                   | Great previews and analytics                                                                                                       | The Hobby plan is for non-commercial use (a personal portfolio is fine)                                |
 
+## Resume, link previews and placeholders
+
+- **Resume:** replace `public/resume.pdf`. The "Download resume" buttons (About and Contact) show its size and disappear if the file is removed.
+- **Link previews:** after changing a full record's title or cover colours (or adding one), run `npm run og` and commit the PNGs in `public/og/`. `npm run check` warns when an image is missing or older than its record.
+- **Placeholders:** `npm run dev` shows any placeholder as a chip. A production build leaves out values that are only a placeholder, so to see what visitors get run `npm run build && npm run preview`.
+
 ## The turntable
 
 On desktop, playing a record runs a real-time three.js scene: the sleeve flies from the crate to the deck, the record drops onto the platter, the tonearm cues to the lead-in groove and the record spins up (33⅓ rpm for 12", 45 rpm for 7"). It's built from code, not models (`src/components/Turntable/three/`), and three.js is only ever loaded with a dynamic `import()`, prefetched when you first hover or focus the crate. Everywhere else, and on any WebGL problem, the CSS turntable (`CssTurntable.astro`) is used instead. To see the fallbacks: narrow the window below 900px, turn on "Reduce motion" in your OS, or launch Chrome with `--disable-webgl`. `npm run verify` tests all of these and saves screenshots of each phase to `docs/screenshots/phase-3/`.
@@ -105,7 +113,7 @@ On desktop, playing a record runs a real-time three.js scene: the sleeve flies f
 src/
   content.config.ts      collection schemas (zod)
   content/records/       one Markdown file per record (four sections)
-  data/site.ts           name, role, about, photo, contact, resume, OG image
+  data/site.ts           name, role, About copy, photo, contact, default preview image
   components/
     Crate/               the record crate: CSS 3D box, divider tabs
     NowPlaying/          Now Playing panel + mobile sheet, Stage (one per stage kind), Chart
@@ -115,12 +123,17 @@ src/
     FontFaces.astro      self-hosted @font-face + preload
   layouts/Base.astro
   lib/                   url(), record helpers, placeholder pattern + Markdown plugin
-  pages/index.astro      hero, crate, plain list of all records
+  pages/index.astro      hero, crate, plain list of all records, About
   pages/records/[slug].astro   liner notes
+  pages/now-playing.astro      Now Playing templates (fragment fetched on demand)
+  pages/og/              link-preview cards (screenshotted by `npm run og`)
+  pages/404.astro, robots.txt.ts
   styles/                tokens.css, global.css, fonts.css
 public/records/<slug>/   demo videos, posters, stills, certificates
 public/about/            About photo
-scripts/check-placeholders.mjs
+public/resume.pdf        the resume (buttons hide without it)
+public/og/               generated link-preview images (commit them)
+scripts/                 check-placeholders, verify, og
 docs/design/             design mockups (reference only)
 docs/source/             source PDFs (gitignored)
 ```
@@ -136,5 +149,5 @@ Fonts (Big Shoulders, Schibsted Grotesk and Permanent Marker) come from Fontsour
 | 1.5   | Crate dividers (Projects, Experience, Community, Honors), 16-record catalogue, `?crate=` deep links                                   | Done   |
 | 2     | Now Playing: CSS turntable, stage per record (device frame, gallery, diagram, chart, YouTube facade), summary; bottom sheet on mobile | Done   |
 | 3     | three.js turntable (lazy-loaded): record drop, tonearm, 33⅓ rpm spin, reduced-motion and no-WebGL fallbacks                           | Done   |
-| 4     | Liner-notes polish, "Also on the record", About, Contact                                                                              |        |
+| 4     | About, Contact, resume, link previews, sitemap/robots, 404, previous/next records, print stylesheet                                   | Done   |
 | 5     | Optional vinyl crackle (off by default), performance pass, accessibility audit                                                        |        |

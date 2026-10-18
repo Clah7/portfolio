@@ -1,0 +1,768 @@
+---
+/**
+ * The condensed portfolio as an A4 document, printed to PDF by `npm run pdf`
+ * (scripts/pdf.mjs). Only built when PORTFOLIO_PDF is set (astro.config.mjs),
+ * so it's never deployed.
+ *
+ * - Cover: photo, name, role line, bio, contact, contents.
+ * - One section per full record: cover, facts, a still or chart, overview,
+ *   Darren's part and the team's (kept apart), key decisions, result, learned,
+ *   stack, and a link to the online liner notes.
+ * - Also on the record: the card records, one line each.
+ * Same facts as the site: everything comes from the records and site.ts, and
+ * values that are only a placeholder are left out.
+ */
+import '../styles/tokens.css';
+import '../styles/fonts.css';
+import '../styles/global.css';
+import { render } from 'astro:content';
+import FontFaces from '../components/FontFaces.astro';
+import Sleeve from '../components/Sleeve.astro';
+import Chart from '../components/NowPlaying/Chart.astro';
+import { site } from '../data/site';
+import {
+  SECTION_LABELS,
+  assetUrl,
+  getRecords,
+  isFull,
+  recordSlug,
+  type RecordEntry,
+} from '../lib/records';
+import { webpSize } from '../lib/image-size';
+import { shown, visible } from '../lib/visible';
+import { isPlaceholder } from '../lib/placeholder-pattern.mjs';
+import { url } from '../lib/url';
+
+const siteRoot = new URL(url('/'), Astro.site).href;
+const absolute = (path: string) => new URL(assetUrl(path), Astro.site).href;
+const bare = (href: string) => href.replace(/^https?:\/\//, '').replace(/\/$/, '');
+
+const records = await getRecords();
+const full = await Promise.all(
+  records
+    .filter(isFull)
+    .map(async (record) => ({ record, Content: (await render(record)).Content })),
+);
+const cards = records.filter((r) => !isFull(r));
+const cardSections = (['experience', 'community', 'honors'] as const)
+  .map((section) => ({ section, items: cards.filter((r) => r.data.section === section) }))
+  .filter((s) => s.items.length > 0);
+
+const facts = (r: RecordEntry) =>
+  [
+    ['Role', r.data.role],
+    ['Team', r.data.team],
+    ['Organisation', r.data.org],
+    ['Dates', r.data.dates],
+    ['Platform', r.data.platform],
+    ['Location', r.data.location],
+  ].filter((f): f is [string, string] => shown(f[1]));
+
+const cardLine = (r: RecordEntry) =>
+  [r.data.role, r.data.org, r.data.dates, r.data.location].filter(shown).join(' · ');
+
+const realLinks = (r: RecordEntry) =>
+  (r.data.links ?? []).filter((l) => !isPlaceholder(l.href) && !isPlaceholder(l.label));
+
+/** The stills shown under a record's header (a still from the stage, or its chart/diagram). */
+const stills = (r: RecordEntry) => {
+  const { stage } = r.data;
+  if (stage.kind !== 'gallery') return [];
+  const max = stage.device === 'phone' ? 3 : 2;
+  return visible(stage.images ?? [], (img) => [img.src])
+    .slice(0, max)
+    .map((img) => ({ ...img, size: webpSize(img.src) }));
+};
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="robots" content="noindex" />
+    <title>{site.name} · Portfolio</title>
+    <FontFaces />
+  </head>
+  <body>
+    <section class="sheet cover-page">
+      <div class="intro">
+        <figure class="print">
+          <img
+            src={assetUrl(site.photo.src)}
+            alt={site.photo.alt}
+            width={site.photo.width}
+            height={site.photo.height}
+          />
+        </figure>
+        <div class="intro-text">
+          <p class="eyebrow">Portfolio · {site.boxLabel.line2}</p>
+          <h1 class="d">{site.name}</h1>
+          <p class="role">{site.roleLine}</p>
+          <p class="bio">{site.bio}</p>
+          <ul class="reach">
+            <li>
+              <span class="k">Email</span>
+              <a href={`mailto:${site.contact.email}`}>{site.contact.email}</a>
+            </li>
+            <li>
+              <span class="k">LinkedIn</span>
+              <a href={site.contact.linkedin}>{bare(site.contact.linkedin)}</a>
+            </li>
+            <li>
+              <span class="k">GitHub</span>
+              <a href={site.contact.github}>{bare(site.contact.github)}</a>
+            </li>
+            <li>
+              <span class="k">Website</span>
+              <a href={siteRoot}>{bare(siteRoot)}</a>
+            </li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="contents">
+        <h2 class="d">Selected work</h2>
+        <ol>
+          {full.map(({ record }) => (
+            <li>
+              <span class="cat">{record.data.catalogue}</span>
+              <span class="t d">{record.data.title}</span>
+              <span class="tag">{record.data.tagline}</span>
+            </li>
+          ))}
+          <li>
+            <span class="cat">DCL-2–4xx</span>
+            <span class="t d">Also on the record</span>
+            <span class="tag">
+              {cardSections.map((s) => SECTION_LABELS[s.section]).join(', ')}.
+            </span>
+          </li>
+        </ol>
+      </div>
+    </section>
+
+    {full.map(({ record, Content }) => {
+      const d = record.data;
+      const shots = stills(record);
+      const decisions = visible(d.decisions, (x) => [x.topic, x.chose]);
+      const darren = visible(d.credits.darren);
+      const team = visible(d.credits.team);
+      const stack = visible(d.stack);
+      const teamStack = visible(d.teamStack ?? []);
+      const links = realLinks(record);
+      const page = `${siteRoot}records/${recordSlug(record)}/`;
+      return (
+        <article class="sheet project">
+          <header class="head">
+            <Sleeve record={record} size={d.format === '7in' ? 250 : 150} class="sleeve-art" />
+            <div class="head-text">
+              <p class="eyebrow">
+                {d.catalogue} · {SECTION_LABELS[d.section]}
+              </p>
+              <h2 class="d">{d.title}</h2>
+              <p class="tagline">{d.tagline}</p>
+              <dl class="facts">
+                {facts(record).map(([k, v]) => (
+                  <div>
+                    <dt>{k}</dt>
+                    <dd>{v}</dd>
+                  </div>
+                ))}
+              </dl>
+            </div>
+          </header>
+
+          {shots.length > 0 && (
+            <div class={`shots shots--${d.stage.device ?? 'plain'}`}>
+              {shots.map((img) => (
+                <figure>
+                  <img
+                    src={assetUrl(img.src)}
+                    alt={img.alt}
+                    width={img.size?.width}
+                    height={img.size?.height}
+                  />
+                  {shown(img.caption) && <figcaption>{img.caption}</figcaption>}
+                </figure>
+              ))}
+            </div>
+          )}
+          {d.stage.kind === 'chart' && d.stage.chart && (
+            <div class="chart-wrap">
+              <Chart {...d.stage.chart} />
+            </div>
+          )}
+          {d.stage.kind === 'diagram' && d.stage.steps && (
+            <figure class="flow">
+              <ol>
+                {d.stage.steps.map((step) => (
+                  <li>{step}</li>
+                ))}
+              </ol>
+              {shown(d.stage.caption) && <figcaption>{d.stage.caption}</figcaption>}
+            </figure>
+          )}
+
+          <section class="block prose">
+            <h3>Overview</h3>
+            <Content />
+          </section>
+
+          <div class="cols">
+            {darren.length > 0 && (
+              <section class="block">
+                <h3>My part</h3>
+                <ul>
+                  {darren.map((item) => (
+                    <li>{item}</li>
+                  ))}
+                </ul>
+              </section>
+            )}
+            {team.length > 0 && (
+              <section class="block">
+                <h3>The team</h3>
+                <ul>
+                  {team.map((item) => (
+                    <li>{item}</li>
+                  ))}
+                </ul>
+              </section>
+            )}
+          </div>
+
+          {decisions.length > 0 && (
+            <section class="block">
+              <h3>Key decisions</h3>
+              <div class="decisions">
+                {decisions.map((x) => (
+                  <div class="decision">
+                    <p class="topic d">{x.topic}</p>
+                    <p>
+                      <b>Chose:</b> {x.chose}
+                    </p>
+                    {shown(x.rejected) && (
+                      <p>
+                        <b>Over:</b> {x.rejected}
+                      </p>
+                    )}
+                    {shown(x.why) && (
+                      <p>
+                        <b>Why:</b> {x.why}
+                      </p>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </section>
+          )}
+
+          <div class="cols">
+            {shown(d.summary.result) && (
+              <section class="block">
+                <h3>Result</h3>
+                <p>{d.summary.result}</p>
+              </section>
+            )}
+            {shown(d.learned) && (
+              <section class="block">
+                <h3>What I learned</h3>
+                <p>{d.learned}</p>
+              </section>
+            )}
+          </div>
+
+          {stack.length > 0 && (
+            <section class="block">
+              <h3>Stack</h3>
+              <p class="stack">
+                {stack.join(' · ')}
+                {teamStack.length > 0 && (
+                  <span class="team-stack"> Team: {teamStack.join(' · ')}</span>
+                )}
+              </p>
+            </section>
+          )}
+
+          <p class="more">
+            {links.map((l) => (
+              <>
+                <a href={/^https?:/.test(l.href) ? l.href : absolute(l.href)}>{l.label}</a>
+                {' · '}
+              </>
+            ))}
+            Full liner notes: <a href={page}>{bare(page)}</a>
+          </p>
+        </article>
+      );
+    })}
+
+    <section class="sheet also">
+      <h2 class="d">Also on the record</h2>
+      {cardSections.map(({ section, items }) => (
+        <section class="group">
+          <h3 class="eyebrow">{SECTION_LABELS[section]}</h3>
+          <ul>
+            {items.map((r) => {
+              const links = realLinks(r);
+              return (
+                <li>
+                  <p class="line">
+                    <span class="t d">{r.data.title}</span>
+                    <span class="meta">{cardLine(r)}</span>
+                  </p>
+                  <p class="tag">
+                    {r.data.tagline}
+                    {links.map((l) => (
+                      <>
+                        {' '}
+                        <a href={/^https?:/.test(l.href) ? l.href : absolute(l.href)}>{l.label}</a>
+                      </>
+                    ))}
+                  </p>
+                </li>
+              );
+            })}
+          </ul>
+        </section>
+      ))}
+    </section>
+
+    {/* Markdown links are root-relative; point them at the live site, not the local server. */}
+    <script is:inline define:vars={{ origin: new URL(siteRoot).origin }}>
+      for (const a of document.querySelectorAll('a[href^="/"]')) {
+        a.href = new URL(a.getAttribute('href'), origin).href;
+      }
+    </script>
+  </body>
+</html>
+
+<style is:global>
+  @page {
+    size: A4;
+    margin: 16mm 15mm 18mm;
+
+    @bottom-left {
+      content: 'Darren Christian Liharja · Portfolio';
+      font-family: var(--font-body);
+      font-size: 8pt;
+      color: #6b625a;
+    }
+
+    @bottom-right {
+      content: counter(page) ' / ' counter(pages);
+      font-family: var(--font-body);
+      font-size: 8pt;
+      color: #6b625a;
+    }
+  }
+
+  @page :first {
+    @bottom-left {
+      content: none;
+    }
+  }
+
+  html,
+  body {
+    margin: 0;
+    background: #fff;
+    color: var(--ink);
+    font-family: var(--font-body);
+    font-size: 9.5pt;
+    line-height: 1.45;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .sheet + .sheet {
+    break-before: page;
+  }
+
+  h1,
+  h2,
+  h3,
+  p,
+  ul,
+  ol,
+  dl,
+  dd,
+  figure {
+    margin: 0;
+  }
+
+  a {
+    color: var(--accent);
+    text-decoration: underline;
+    text-underline-offset: 2px;
+  }
+
+  .eyebrow {
+    font-size: 7.5pt;
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--accent);
+  }
+
+  .d {
+    font-family: var(--font-display);
+    text-transform: uppercase;
+    font-weight: 900;
+    line-height: 0.92;
+  }
+
+  /* ---------- cover ---------- */
+
+  .intro {
+    display: grid;
+    grid-template-columns: 58mm 1fr;
+    gap: 10mm;
+    align-items: center;
+    padding-top: 6mm;
+  }
+
+  .print {
+    padding: 3mm 3mm 9mm;
+    background: #fbf8f2;
+    box-shadow: 0 1mm 3mm rgba(40, 25, 10, 0.25);
+    transform: rotate(-2deg);
+  }
+
+  .print img {
+    display: block;
+    width: 100%;
+    height: auto;
+  }
+
+  .intro-text {
+    display: flex;
+    flex-direction: column;
+    gap: 3.5mm;
+  }
+
+  h1 {
+    font-size: 40pt;
+  }
+
+  .role {
+    font-size: 12pt;
+    font-weight: 600;
+    line-height: 1.3;
+  }
+
+  .bio {
+    font-size: 10.5pt;
+  }
+
+  .reach {
+    display: grid;
+    gap: 1.2mm;
+    margin-top: 2mm;
+    padding: 0;
+    list-style: none;
+  }
+
+  .reach .k {
+    display: inline-block;
+    width: 20mm;
+    font-size: 7.5pt;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+
+  .contents {
+    margin-top: 16mm;
+    padding-top: 6mm;
+    border-top: 2px solid var(--ink);
+  }
+
+  .contents h2 {
+    font-size: 22pt;
+    margin-bottom: 4mm;
+  }
+
+  .contents ol {
+    padding: 0;
+    list-style: none;
+  }
+
+  .contents li {
+    display: grid;
+    grid-template-columns: 24mm 46mm 1fr;
+    gap: 4mm;
+    align-items: baseline;
+    padding-block: 2.6mm;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .cat {
+    font-size: 8pt;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    color: var(--accent);
+  }
+
+  .contents .t {
+    font-size: 15pt;
+  }
+
+  .tag {
+    color: var(--muted);
+  }
+
+  /* ---------- a project ---------- */
+
+  .head {
+    display: flex;
+    gap: 8mm;
+    align-items: flex-start;
+    padding-bottom: 5mm;
+    border-bottom: 2px solid var(--ink);
+  }
+
+  .head .sleeve-art {
+    flex: 0 0 auto;
+  }
+
+  .head-text {
+    display: flex;
+    flex-direction: column;
+    gap: 2.4mm;
+    min-width: 0;
+  }
+
+  .head h2 {
+    font-size: 34pt;
+  }
+
+  .tagline {
+    font-size: 11pt;
+    font-weight: 600;
+    line-height: 1.3;
+  }
+
+  .facts {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 2mm 7mm;
+    margin-top: 1mm;
+  }
+
+  .facts dt {
+    font-size: 7pt;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+
+  .facts dd {
+    font-weight: 600;
+  }
+
+  .shots {
+    display: flex;
+    justify-content: center;
+    gap: 6mm;
+    margin-top: 5mm;
+    break-inside: avoid;
+  }
+
+  .shots figure {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1.6mm;
+  }
+
+  .shots img {
+    display: block;
+    height: auto;
+    border: 2.2mm solid var(--ink);
+  }
+
+  .shots--phone img {
+    width: 34mm;
+    border-radius: 5mm;
+  }
+
+  .shots--tablet img {
+    width: 78mm;
+    border-radius: 3mm;
+  }
+
+  .shots--plain img {
+    width: 80mm;
+    border: 1px solid var(--line);
+  }
+
+  .shots figcaption,
+  .flow figcaption {
+    font-size: 7.5pt;
+    color: var(--muted);
+    text-align: center;
+  }
+
+  .chart-wrap {
+    max-width: 120mm;
+    margin: 5mm auto 0;
+    break-inside: avoid;
+  }
+
+  .flow {
+    margin-top: 5mm;
+    break-inside: avoid;
+  }
+
+  .flow ol {
+    display: flex;
+    gap: 2mm;
+    padding: 0;
+    list-style: none;
+    counter-reset: step;
+  }
+
+  .flow li {
+    flex: 1 1 0;
+    padding: 2.5mm;
+    border: 1.5px solid var(--ink);
+    font-size: 8pt;
+    font-weight: 600;
+    line-height: 1.25;
+  }
+
+  .flow li::before {
+    counter-increment: step;
+    content: counter(step);
+    display: block;
+    margin-bottom: 1mm;
+    font-size: 7pt;
+    color: var(--accent);
+  }
+
+  .flow figcaption {
+    margin-top: 1.6mm;
+  }
+
+  .block {
+    margin-top: 5mm;
+  }
+
+  .block h3 {
+    margin-bottom: 1.6mm;
+    font-family: var(--font-display);
+    font-size: 13pt;
+    font-weight: 900;
+    text-transform: uppercase;
+    break-after: avoid;
+  }
+
+  .block ul {
+    display: grid;
+    gap: 1.2mm;
+    padding-left: 4.5mm;
+  }
+
+  .prose p + p,
+  .prose p + ul,
+  .prose ul + p {
+    margin-top: 2mm;
+  }
+
+  .prose ul {
+    display: grid;
+    gap: 1mm;
+    margin-top: 2mm;
+    padding-left: 4.5mm;
+  }
+
+  .cols {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(70mm, 1fr));
+    gap: 0 8mm;
+  }
+
+  .decisions {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(52mm, 1fr));
+    gap: 3mm;
+  }
+
+  .decision {
+    display: grid;
+    align-content: start;
+    gap: 1mm;
+    padding: 3mm;
+    border: 1px solid var(--line);
+    break-inside: avoid;
+  }
+
+  .decision .topic {
+    margin-bottom: 0.6mm;
+    font-size: 11pt;
+  }
+
+  .stack {
+    font-weight: 600;
+  }
+
+  .team-stack {
+    font-weight: 400;
+    color: var(--muted);
+  }
+
+  .more {
+    margin-top: 6mm;
+    padding-top: 2.5mm;
+    border-top: 1px solid var(--line);
+    font-size: 8.5pt;
+    color: var(--muted);
+    break-inside: avoid;
+  }
+
+  /* ---------- also on the record ---------- */
+
+  .also > h2 {
+    font-size: 30pt;
+    padding-bottom: 4mm;
+    border-bottom: 2px solid var(--ink);
+  }
+
+  .group {
+    margin-top: 6mm;
+  }
+
+  .group ul {
+    padding: 0;
+    list-style: none;
+  }
+
+  .group li {
+    padding-block: 2.4mm;
+    border-bottom: 1px solid var(--line);
+    break-inside: avoid;
+  }
+
+  .line {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 1mm 4mm;
+  }
+
+  .line .t {
+    font-size: 13pt;
+  }
+
+  .meta {
+    font-size: 8.5pt;
+    font-weight: 600;
+  }
+
+  .group .tag {
+    margin-top: 0.8mm;
+  }
+</style>

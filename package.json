@@ -13,10 +13,13 @@
     "preview": "astro preview",
     "check": "astro check && node scripts/check-placeholders.mjs",
     "format": "prettier --write .",
-    "verify": "node scripts/verify.mjs"
+    "verify": "node scripts/verify.mjs",
+    "og": "astro build && node scripts/og.mjs",
+    "pdf": "PORTFOLIO_PDF=1 astro build && node scripts/pdf.mjs && astro build"
   },
   "dependencies": {
     "@astrojs/markdown-satteri": "^0.4.4",
+    "@astrojs/sitemap": "^3.7.4",
     "@fontsource-variable/big-shoulders": "^5.3.0",
     "@fontsource-variable/schibsted-grotesk": "^5.3.0",
     "@fontsource/permanent-marker": "^5.3.0",

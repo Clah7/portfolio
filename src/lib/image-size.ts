@@ -1,7 +1,8 @@
 import { readFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
+import { join } from 'node:path';
 
-const publicDir = new URL('../../public/', import.meta.url);
+// From the project root: at build time this runs from a bundled chunk.
+const publicDir = join(process.cwd(), 'public');
 
 /**
  * Intrinsic size of a WebP under public/ (e.g. "records/power-smart/screens.webp"), read
@@ -12,7 +13,7 @@ export function webpSize(src: string): { width: number; height: number } | undef
   if (!src.endsWith('.webp') || /^https?:\/\//.test(src)) return undefined;
   let buf: Buffer;
   try {
-    buf = readFileSync(fileURLToPath(new URL(src.replace(/^\/+/, ''), publicDir)));
+    buf = readFileSync(join(publicDir, src.replace(/^\/+/, '')));
   } catch {
     return undefined;
   }

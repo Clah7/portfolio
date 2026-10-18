@@ -70,6 +70,29 @@ export function initNowPlaying(): void {
 
   const template = (slug: string) =>
     document.querySelector<HTMLTemplateElement>(`template[data-np="${CSS.escape(slug)}"]`);
+
+  // The 16 record templates live in a separate fragment (src/pages/now-playing.astro),
+  // so the homepage's first paint doesn't wait for them. Fetched once: on the first
+  // crate hover/focus, a play, or a deep link. Their styles are already on the page.
+  let loadingTemplates: Promise<boolean> | null = null;
+  const loadTemplates = () =>
+    (loadingTemplates ??= (async () => {
+      if (document.querySelector('template[data-np]')) return true;
+      const src = panel.dataset.npSrc;
+      if (!src) return false;
+      try {
+        const response = await fetch(src);
+        if (!response.ok) return false;
+        const holder = document.createElement('div');
+        holder.hidden = true;
+        holder.innerHTML = await response.text();
+        for (const script of holder.querySelectorAll('script')) script.remove();
+        document.body.append(holder);
+        return true;
+      } catch {
+        return false;
+      }
+    })());
   const sleeveFor = (slug: string) =>
     document.querySelector<HTMLAnchorElement>(`[data-crate] a[data-slug="${CSS.escape(slug)}"]`);
 
@@ -232,7 +255,10 @@ export function initNowPlaying(): void {
       playing.root.querySelector<HTMLElement>('#np-title')?.focus();
       return;
     }
-    open(slug);
+    void loadTemplates().then((ok) => {
+      // If the fragment can't load, fall back to the sleeve's own link.
+      if (!ok || !open(slug)) window.location.assign(event.detail.href);
+    });
   });
 
   for (const container of [panel, sheet]) {
@@ -251,8 +277,9 @@ export function initNowPlaying(): void {
     if (!closingSheet && playing?.container === sheet) close();
   });
 
-  window.addEventListener('popstate', () => {
+  window.addEventListener('popstate', async () => {
     const slug = new URL(window.location.href).searchParams.get('record');
+    if (slug) await loadTemplates();
     if (slug && template(slug)) {
       if (playing?.slug !== slug) open(slug, { push: false });
     } else {
@@ -310,6 +337,7 @@ export function initNowPlaying(): void {
   // Fetch and build the three.js deck while the visitor browses the crate.
   const crate = document.querySelector('[data-crate]');
   const prefetch = () => {
+    void loadTemplates();
     if (desktop3d()) void loadTurntable().then((m) => m?.prefetch());
   };
   crate?.addEventListener('pointerenter', prefetch, { once: true });
@@ -318,9 +346,14 @@ export function initNowPlaying(): void {
   // ---------- deep link ----------
 
   const initial = new URL(window.location.href).searchParams.get('record');
-  if (!initial || !open(initial, { animate: false, push: false })) {
+  const release = () => {
     // NowPlaying.astro may have opened the panel's space for a deep link; release it.
     panel.hidden = true;
     panel.style.minHeight = '';
-  }
+  };
+  if (!initial) release();
+  else
+    void loadTemplates().then((ok) => {
+      if (!ok || !open(initial, { animate: false, push: false })) release();
+    });
 }

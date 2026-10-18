@@ -1,0 +1,135 @@
+---
+/**
+ * "Request a session": email, LinkedIn, GitHub, a copy-email button and (when
+ * public/resume.pdf exists) the resume download. One block, used in the footer
+ * of every page.
+ */
+import { site } from '../data/site';
+import { resume } from '../lib/resume';
+
+const cv = resume();
+---
+
+<section id="contact" class="page contact" aria-labelledby="contact-h">
+  <h2 id="contact-h" class="d">
+    Request a session
+  </h2>
+  <ul class="links">
+    <li>
+      <a class="tap link" href={`mailto:${site.contact.email}`}>
+        {site.contact.email}
+      </a>
+    </li>
+    <li class="copy-item" hidden data-copy-item>
+      <button type="button" class="copy" data-copy-email={site.contact.email}>
+        Copy email
+      </button>
+    </li>
+    <li>
+      <a class="tap link" href={site.contact.linkedin}>
+        LinkedIn
+      </a>
+    </li>
+    <li>
+      <a class="tap link" href={site.contact.github}>
+        GitHub
+      </a>
+    </li>
+    {cv && (
+      <li>
+        <a class="resume" href={cv.href} download>
+          Download resume <span class="size">(PDF, {cv.size})</span>
+        </a>
+      </li>
+    )}
+  </ul>
+  <p class="visually-hidden" aria-live="polite" data-copy-status></p>
+</section>
+
+<script>
+  // Copy the address; announce it. Without the Clipboard API the button stays hidden.
+  for (const button of document.querySelectorAll<HTMLButtonElement>('[data-copy-email]')) {
+    if (!navigator.clipboard?.writeText) continue;
+    const item = button.closest<HTMLElement>('[data-copy-item]');
+    const status = button.closest('section')?.querySelector<HTMLElement>('[data-copy-status]');
+    if (item) item.hidden = false;
+    button.addEventListener('click', async () => {
+      try {
+        await navigator.clipboard.writeText(button.dataset.copyEmail ?? '');
+        if (status) {
+          status.textContent = '';
+          requestAnimationFrame(() => (status.textContent = 'Email copied'));
+        }
+      } catch {
+        // Clipboard refused (permissions): fail silently, the mailto link still works.
+      }
+    });
+  }
+</script>
+
+<style>
+  .contact {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    padding-block: 32px 64px;
+  }
+
+  h2 {
+    font-size: clamp(2.25rem, 5vw, 3.5rem);
+    font-weight: 900;
+  }
+
+  .links {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px 16px;
+    padding: 0;
+    list-style: none;
+    font-weight: 600;
+  }
+
+  .copy {
+    display: inline-flex;
+    align-items: center;
+    min-height: var(--tap);
+    padding: 0 14px;
+    border: 1.5px solid var(--ink);
+    border-radius: var(--radius-pill);
+    background: transparent;
+    color: var(--ink);
+    font: inherit;
+    font-size: 0.875rem;
+    cursor: pointer;
+  }
+
+  .copy:hover {
+    background: var(--paper-raised);
+  }
+
+  .resume {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    min-height: 48px;
+    padding: 0 20px;
+    border-radius: var(--radius-pill);
+    background: var(--ink);
+    color: var(--paper);
+    font-weight: 700;
+    text-decoration: none;
+  }
+
+  .resume:hover {
+    background: var(--accent);
+    color: var(--accent-ink);
+  }
+
+  .size {
+    font-weight: 500;
+    opacity: 0.85;
+  }
+</style>

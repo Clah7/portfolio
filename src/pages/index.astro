@@ -1,14 +1,29 @@
 ---
 import Base from '../layouts/Base.astro';
+import About from '../components/About.astro';
 import Crate from '../components/Crate/Crate.astro';
 import NowPlaying from '../components/NowPlaying/NowPlaying.astro';
 import Ph from '../components/Placeholder.astro';
 import { site } from '../data/site';
+import { url } from '../lib/url';
 import { render } from 'astro:content';
 import { isPlaceholder } from '../lib/placeholder-pattern.mjs';
+import { shown } from '../lib/visible';
 import { assetUrl, getSections, isFull, listId, recordHref } from '../lib/records';
 
 const sections = await getSections();
+
+// schema.org Person (homepage only)
+const person = {
+  '@context': 'https://schema.org',
+  '@type': 'Person',
+  name: site.name,
+  jobTitle: site.jobTitle,
+  url: new URL(url('/'), Astro.site).href,
+  email: `mailto:${site.contact.email}`,
+  sameAs: [site.contact.linkedin, site.contact.github],
+  alumniOf: { '@type': 'CollegeOrUniversity', name: site.school },
+};
 // Card records show their short Markdown body in the list (they have no page).
 const bodies = new Map(
   await Promise.all(
@@ -20,7 +35,7 @@ const bodies = new Map(
 );
 ---
 
-<Base>
+<Base jsonLd={person}>
   <div class="intro">
     <section class="hero" aria-labelledby="hero-name">
       <h1 id="hero-name" class="d">
@@ -106,19 +121,17 @@ const bodies = new Map(
                     <Body />
                   </div>
                 ) : (
-                  <p class="tagline">
-                    <Ph text={tagline} />
-                  </p>
+                  <p class="tagline">{shown(tagline) && <Ph text={tagline} />}</p>
                 )}
                 <p class="meta">
-                  <Ph text={role} />
-                  {where && (
+                  {shown(role) && <Ph text={role} />}
+                  {shown(where) && (
                     <>
                       {' · '}
                       <Ph text={where} />
                     </>
                   )}
-                  {dates && (
+                  {shown(dates) && (
                     <>
                       <br />
                       <Ph text={dates} />
@@ -133,9 +146,11 @@ const bodies = new Map(
                   )}
                   {links?.map((link) =>
                     isPlaceholder(link.href) ? (
-                      <span class="action pending">
-                        {link.label}: <Ph text={link.href} />
-                      </span>
+                      shown(link.href) && (
+                        <span class="action pending">
+                          {link.label}: <Ph text={link.href} />
+                        </span>
+                      )
                     ) : (
                       <a class="tap action" href={assetUrl(link.href)}>
                         {link.label}
@@ -151,6 +166,8 @@ const bodies = new Map(
       </section>
     ))}
   </section>
+
+  <About />
 </Base>
 
 <style>

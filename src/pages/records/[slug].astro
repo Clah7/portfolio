@@ -26,21 +26,28 @@ import {
   type FullRecordEntry,
 } from '../../lib/records';
 import { url } from '../../lib/url';
+import { shown, visible } from '../../lib/visible';
+import { site } from '../../data/site';
 
 export const getStaticPaths = (async () => {
   const records = (await getRecords()).filter(isFull);
   return records.map((record, i) => ({
     params: { slug: recordSlug(record) },
-    props: { record, next: records[(i + 1) % records.length] },
+    props: {
+      record,
+      prev: records[(i - 1 + records.length) % records.length],
+      next: records[(i + 1) % records.length],
+    },
   }));
 }) satisfies GetStaticPaths;
 
 interface Props {
   record: FullRecordEntry;
+  prev: FullRecordEntry;
   next: FullRecordEntry;
 }
 
-const { record, next } = Astro.props;
+const { record, prev, next } = Astro.props;
 const d = record.data;
 const { Content } = await render(record);
 
@@ -51,12 +58,21 @@ const facts = [
   { label: 'Studio', value: d.org },
   { label: 'Location', value: d.location },
   { label: 'Platform', value: d.platform },
-].filter((f): f is { label: string; value: string } => Boolean(f.value));
+].filter((f): f is { label: string; value: string } => shown(f.value));
+
+// Production builds leave out anything that is only a placeholder (src/lib/visible.ts).
+const credits = { darren: visible(d.credits.darren), team: visible(d.credits.team) };
+const decisions = visible(d.decisions, (x) => [x.topic, x.chose, x.rejected, x.why]);
+const bsides = visible(d.bsides, (b) => [b.idea, b.whyCut]);
+const stack = visible(d.stack);
+const teamStack = visible(d.teamStack);
+const problem = shown(d.summary.problem) ? d.summary.problem : undefined;
+const learned = shown(d.learned) ? d.learned : undefined;
 
 // "Result & what I learned": each half only when there's something to say.
-const result = d.summary.result;
+const result = shown(d.summary.result) ? d.summary.result : undefined;
 const resultLabel =
-  result && d.learned ? 'Result & what I learned' : result ? 'Result' : 'What I learned';
+  result && learned ? 'Result & what I learned' : result ? 'Result' : 'What I learned';
 
 const tracks = [
   {
@@ -78,18 +94,25 @@ const tracks = [
 ].map(({ side, items }) => ({
   side,
   items: items
-    .filter(([id]) => id !== 'bsides' || d.bsides?.length)
-    .filter(([id]) => id !== 'result' || result || d.learned)
+    .filter(([id]) => id !== 'credits' || credits.darren.length || credits.team.length)
+    .filter(([id]) => id !== 'session' || decisions.length)
+    .filter(([id]) => id !== 'bsides' || bsides.length)
+    .filter(([id]) => id !== 'result' || result || learned)
+    .filter(([id]) => id !== 'stack' || stack.length || teamStack.length)
     .map(([id, label], i) => ({ id, label, no: `${side}${i + 1}` })),
 }));
 // "From the session": extra stills and diagrams (the stage itself is shown above).
-const stills = d.session ?? [];
+const stills = visible(d.session, (x) => ['src' in x ? x.src : x.steps.join(' ')]);
 const playUrl = `${url('/')}?record=${recordSlug(record)}`;
 
 const trackNo = Object.fromEntries(tracks.flatMap((t) => t.items.map((it) => [it.id, it.no])));
 ---
 
-<Base title={`Liner notes: ${d.title}`} description={d.tagline}>
+<Base
+  title={`${d.title} — liner notes · ${site.name}`}
+  description={d.tagline}
+  ogImage={`og/${recordSlug(record)}.png`}
+>
   <section class="intro page" aria-labelledby="ln-title">
     <a class="back tap" href={url('/')}>
       <svg
@@ -173,46 +196,50 @@ const trackNo = Object.fromEntries(tracks.flatMap((t) => t.items.map((it) => [it
   </nav>
 
   <article class="page notes">
-    <section id="credits" class="track" aria-labelledby="credits-h">
-      <div class="track-head">
-        <p class="no d" aria-hidden="true">
-          {trackNo.credits}
-        </p>
-        <h2 id="credits-h" class="d">
-          Credits
-        </h2>
-      </div>
-      <div class="credits">
-        <div class="card card--raised">
-          <p class="eyebrow accent">Darren played</p>
-          <p class="card-title d">
-            <Ph text={d.role} />
+    {(credits.darren.length > 0 || credits.team.length > 0) && (
+      <section id="credits" class="track" aria-labelledby="credits-h">
+        <div class="track-head">
+          <p class="no d" aria-hidden="true">
+            {trackNo.credits}
           </p>
-          <ul>
-            {d.credits.darren.map((c) => (
-              <li>
-                <Ph text={c} />
-              </li>
-            ))}
-          </ul>
+          <h2 id="credits-h" class="d">
+            Credits
+          </h2>
         </div>
-        {d.credits.team.length > 0 && (
-          <div class="card">
-            <p class="eyebrow">The band played</p>
-            <p class="card-title d">
-              <Ph text={d.team ?? 'The team'} />
-            </p>
-            <ul>
-              {d.credits.team.map((c) => (
-                <li>
-                  <Ph text={c} />
-                </li>
-              ))}
-            </ul>
-          </div>
-        )}
-      </div>
-    </section>
+        <div class="credits">
+          {credits.darren.length > 0 && (
+            <div class="card card--raised">
+              <p class="eyebrow accent">Darren played</p>
+              <p class="card-title d">
+                <Ph text={d.role} />
+              </p>
+              <ul>
+                {credits.darren.map((c) => (
+                  <li>
+                    <Ph text={c} />
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+          {credits.team.length > 0 && (
+            <div class="card">
+              <p class="eyebrow">The band played</p>
+              <p class="card-title d">
+                <Ph text={d.team ?? 'The team'} />
+              </p>
+              <ul>
+                {credits.team.map((c) => (
+                  <li>
+                    <Ph text={c} />
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
+      </section>
+    )}
 
     <section id="problem" class="track" aria-labelledby="problem-h">
       <div class="track-head">
@@ -224,62 +251,62 @@ const trackNo = Object.fromEntries(tracks.flatMap((t) => t.items.map((it) => [it
         </h2>
       </div>
       <div class="problem">
-        <p class="statement d">
-          <Ph text={d.summary.problem} />
-        </p>
+        <p class="statement d">{problem && <Ph text={problem} />}</p>
         <div class="prose">
           <Content />
         </div>
       </div>
     </section>
 
-    <section id="session" class="track" aria-labelledby="session-h">
-      <div class="track-head">
-        <p class="no d" aria-hidden="true">
-          {trackNo.session}
-        </p>
-        <h2 id="session-h" class="d">
-          Session notes
-        </h2>
-        <p class="sub">Key decisions: what made the cut, and what didn't.</p>
-      </div>
-      <ol class="cards">
-        {d.decisions.map((dec, i) => (
-          <li class="card card--raised">
-            <p class="eyebrow accent">Take {i + 1}</p>
-            <h3 class="d">
-              <Ph text={dec.topic} />
-            </h3>
-            <dl class="take">
-              <div>
-                <dt>Chose</dt>
-                <dd>
-                  <Ph text={dec.chose} />
-                </dd>
-              </div>
-              {dec.rejected && (
+    {decisions.length > 0 && (
+      <section id="session" class="track" aria-labelledby="session-h">
+        <div class="track-head">
+          <p class="no d" aria-hidden="true">
+            {trackNo.session}
+          </p>
+          <h2 id="session-h" class="d">
+            Session notes
+          </h2>
+          <p class="sub">Key decisions: what made the cut, and what didn't.</p>
+        </div>
+        <ol class="cards">
+          {decisions.map((dec, i) => (
+            <li class="card card--raised">
+              <p class="eyebrow accent">Take {i + 1}</p>
+              <h3 class="d">
+                <Ph text={dec.topic} />
+              </h3>
+              <dl class="take">
                 <div>
-                  <dt>Rejected</dt>
+                  <dt>Chose</dt>
                   <dd>
-                    <Ph text={dec.rejected} />
+                    <Ph text={dec.chose} />
                   </dd>
                 </div>
-              )}
-              {dec.why && (
-                <div>
-                  <dt>Why</dt>
-                  <dd>
-                    <Ph text={dec.why} />
-                  </dd>
-                </div>
-              )}
-            </dl>
-          </li>
-        ))}
-      </ol>
-    </section>
+                {shown(dec.rejected) && (
+                  <div>
+                    <dt>Rejected</dt>
+                    <dd>
+                      <Ph text={dec.rejected} />
+                    </dd>
+                  </div>
+                )}
+                {shown(dec.why) && (
+                  <div>
+                    <dt>Why</dt>
+                    <dd>
+                      <Ph text={dec.why} />
+                    </dd>
+                  </div>
+                )}
+              </dl>
+            </li>
+          ))}
+        </ol>
+      </section>
+    )}
 
-    {d.bsides?.length ? (
+    {bsides.length ? (
       <section id="bsides" class="track" aria-labelledby="bsides-h">
         <div class="track-head">
           <p class="no d" aria-hidden="true">
@@ -291,7 +318,7 @@ const trackNo = Object.fromEntries(tracks.flatMap((t) => t.items.map((it) => [it
           <p class="sub">Ideas that were recorded, then left off the album.</p>
         </div>
         <ol class="cards">
-          {d.bsides.map((b, i) => (
+          {bsides.map((b, i) => (
             <li class="card card--dashed">
               <p class="eyebrow">Unreleased · {i + 1}</p>
               <h3 class="d">
@@ -306,7 +333,7 @@ const trackNo = Object.fromEntries(tracks.flatMap((t) => t.items.map((it) => [it
       </section>
     ) : null}
 
-    {(result || d.learned) && (
+    {(result || learned) && (
       <section id="result" class="track" aria-labelledby="result-h">
         <div class="track-head">
           <p class="no d" aria-hidden="true">
@@ -325,11 +352,11 @@ const trackNo = Object.fromEntries(tracks.flatMap((t) => t.items.map((it) => [it
               </p>
             </div>
           )}
-          {d.learned && (
+          {learned && (
             <div>
               <h3 class="eyebrow">What I learned</h3>
               <p>
-                <Ph text={d.learned} />
+                <Ph text={learned} />
               </p>
             </div>
           )}
@@ -337,48 +364,50 @@ const trackNo = Object.fromEntries(tracks.flatMap((t) => t.items.map((it) => [it
       </section>
     )}
 
-    <section id="stack" class="track" aria-labelledby="stack-h">
-      <div class="track-head">
-        <p class="no d" aria-hidden="true">
-          {trackNo.stack}
-        </p>
-        <h2 id="stack-h" class="d">
-          Stack
-        </h2>
-      </div>
-      {d.teamStack?.length ? (
-        <div class="stack-groups">
-          <div>
-            <h3 class="eyebrow accent">Darren used</h3>
-            <ul class="stack">
-              {d.stack.map((s) => (
-                <li class="d">
-                  <Ph text={s} />
-                </li>
-              ))}
-            </ul>
-          </div>
-          <div>
-            <h3 class="eyebrow">The band used</h3>
-            <ul class="stack">
-              {d.teamStack.map((s) => (
-                <li class="d">
-                  <Ph text={s} />
-                </li>
-              ))}
-            </ul>
-          </div>
+    {(stack.length > 0 || teamStack.length > 0) && (
+      <section id="stack" class="track" aria-labelledby="stack-h">
+        <div class="track-head">
+          <p class="no d" aria-hidden="true">
+            {trackNo.stack}
+          </p>
+          <h2 id="stack-h" class="d">
+            Stack
+          </h2>
         </div>
-      ) : (
-        <ul class="stack">
-          {d.stack.map((s) => (
-            <li class="d">
-              <Ph text={s} />
-            </li>
-          ))}
-        </ul>
-      )}
-    </section>
+        {teamStack.length ? (
+          <div class="stack-groups">
+            <div>
+              <h3 class="eyebrow accent">Darren used</h3>
+              <ul class="stack">
+                {stack.map((s) => (
+                  <li class="d">
+                    <Ph text={s} />
+                  </li>
+                ))}
+              </ul>
+            </div>
+            <div>
+              <h3 class="eyebrow">The band used</h3>
+              <ul class="stack">
+                {teamStack.map((s) => (
+                  <li class="d">
+                    <Ph text={s} />
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
+        ) : (
+          <ul class="stack">
+            {stack.map((s) => (
+              <li class="d">
+                <Ph text={s} />
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+    )}
     {stills.length > 0 && (
       <section class="stills" aria-labelledby="stills-h">
         <h2 id="stills-h" class="d">
@@ -417,31 +446,41 @@ const trackNo = Object.fromEntries(tracks.flatMap((t) => t.items.map((it) => [it
   </article>
 
   {next.id !== record.id && (
-    <section class="page next-wrap" aria-label="Next record">
-      <a
-        class="next"
-        href={url(`/records/${recordSlug(next)}/`)}
-        style={`--ground:${next.data.cover.ground}; --sleeve-ink:${next.data.cover.ink}`}
-      >
-        <span class="next-text">
-          <span class="eyebrow">Next record · {next.data.catalogue}</span>
-          <span class="next-title d">{next.data.title}</span>
-        </span>
-        <svg
-          aria-hidden="true"
-          width="48"
-          height="48"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="1.8"
-          stroke-linecap="round"
-          stroke-linejoin="round"
-        >
-          <path d="M5 12h14M13 6l6 6-6 6" />
-        </svg>
-      </a>
-    </section>
+    <nav class="page records-nav" aria-label="More records">
+      {[
+        { rec: prev, dir: 'Previous record', arrow: 'M19 12H5M11 6l-6 6 6 6' },
+        { rec: next, dir: 'Next record', arrow: 'M5 12h14M13 6l6 6-6 6' },
+      ]
+        .filter(({ rec }, i) => i === 1 || rec.id !== next.id)
+        .map(({ rec, dir, arrow }) => (
+          <a
+            class:list={['step', dir === 'Next record' && 'step--next']}
+            href={url(`/records/${recordSlug(rec)}/`)}
+          >
+            <Sleeve record={rec} size={88} class="thumb" />
+            <span class="step-text">
+              <span class="eyebrow">
+                {dir} · {rec.data.catalogue}
+              </span>
+              <span class="step-title d">{rec.data.title}</span>
+            </span>
+            <svg
+              class="arrow"
+              aria-hidden="true"
+              width="28"
+              height="28"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <path d={arrow} />
+            </svg>
+          </a>
+        ))}
+    </nav>
   )}
 </Base>
 
@@ -837,41 +876,102 @@ const trackNo = Object.fromEntries(tracks.flatMap((t) => t.items.map((it) => [it
     border: 1.5px dashed #8a7f70;
   }
 
-  /* Next record */
-  .next-wrap {
+  /* Previous / next record */
+  .records-nav {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(300px, 100%), 1fr));
+    gap: 16px;
     padding-block: 16px 0;
   }
 
-  .next {
+  .step {
     display: flex;
-    flex-wrap: wrap;
     align-items: center;
-    justify-content: space-between;
-    gap: 20px;
-    padding: 32px clamp(20px, 3vw, 40px);
-    background: var(--ground);
-    color: var(--sleeve-ink);
+    gap: 18px;
+    min-height: 120px;
+    padding: 16px 20px;
+    border: 1px solid var(--line);
+    background: var(--paper-raised);
+    color: var(--ink);
     text-decoration: none;
-    box-shadow: var(--shadow-sleeve);
   }
 
-  .next:hover {
-    color: var(--sleeve-ink);
+  .step:hover {
+    border-color: var(--ink);
+    color: var(--ink);
   }
 
-  .next-text {
+  .step--next {
+    flex-direction: row-reverse;
+    text-align: right;
+  }
+
+  .step :global(.thumb) {
+    flex: 0 0 auto;
+  }
+
+  .step-text {
     display: flex;
+    flex: 1 1 auto;
     flex-direction: column;
     gap: 6px;
+    min-width: 0;
   }
 
-  .next .eyebrow {
-    color: inherit;
-  }
-
-  .next-title {
-    font-size: clamp(2.5rem, 6vw, 4rem);
+  .step-title {
+    font-size: clamp(1.75rem, 3.5vw, 2.5rem);
     line-height: 0.9;
     font-weight: 900;
+    overflow-wrap: anywhere;
+  }
+
+  .arrow {
+    flex: 0 0 auto;
+    color: var(--accent);
+  }
+
+  /* Print: a smaller cover beside the title, so the stage fits on page one */
+  @media print {
+    .intro {
+      padding-block: 0 24px;
+    }
+
+    .intro-grid {
+      flex-wrap: nowrap;
+      align-items: flex-start;
+      gap: 28px;
+    }
+
+    .intro-grid :global(.cover) {
+      flex: 0 0 auto;
+      --w: 190px !important;
+      box-shadow: none;
+    }
+
+    .intro-text {
+      flex: 1 1 0;
+      gap: 12px;
+    }
+
+    .stage-wrap {
+      padding-bottom: 24px;
+    }
+
+    /* Flex lines move to the next page whole; blocks break between cards */
+    .track {
+      display: block;
+    }
+
+    .track-head {
+      margin-bottom: 16px;
+      break-inside: avoid;
+      break-after: avoid;
+    }
+
+    /* Short sections stay whole (break-after: avoid isn't honoured before a grid) */
+    .track:has(> .pair),
+    .track:has(> .stack) {
+      break-inside: avoid;
+    }
   }
 </style>

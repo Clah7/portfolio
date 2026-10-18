@@ -27,36 +27,23 @@
  * (e.g. for a second run against a build with a different base).
  * First run: `npx playwright install chromium`.
  */
-import { createServer } from 'node:http';
 import { mkdir, readdir, readFile, stat } from 'node:fs/promises';
-import { extname, join, normalize } from 'node:path';
+import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { gzipSync } from 'node:zlib';
 import { chromium } from 'playwright';
 import AxeBuilder from '@axe-core/playwright';
 import lighthouse from 'lighthouse';
 import desktopConfig from 'lighthouse/core/config/desktop-config.js';
+import { dist, serveDist } from './lib/serve-dist.mjs';
 
-const dist = fileURLToPath(new URL('../dist', import.meta.url));
+const publicDir = fileURLToPath(new URL('../public', import.meta.url));
 const recordsDir = fileURLToPath(new URL('../src/content/records', import.meta.url));
 const PORT = Number(process.env.VERIFY_PORT ?? 4398);
 const CDP_PORT = PORT + 1;
 const VIEWPORTS = {
   desktop: { width: 1440, height: 900 },
   mobile: { width: 390, height: 844 },
-};
-const TYPES = {
-  '.html': 'text/html; charset=utf-8',
-  '.css': 'text/css',
-  '.js': 'text/javascript',
-  '.svg': 'image/svg+xml',
-  '.woff2': 'font/woff2',
-  '.png': 'image/png',
-  '.webp': 'image/webp',
-  '.jpg': 'image/jpeg',
-  '.mp4': 'video/mp4',
-  '.webm': 'video/webm',
-  '.pdf': 'application/pdf',
 };
 
 const failures = [];
@@ -89,7 +76,9 @@ async function* htmlFiles(dir) {
 const pages = [];
 for await (const file of htmlFiles(dist)) {
   const rel = file.slice(dist.length + 1).replace(/index\.html$/, '');
-  if (rel.endsWith('.html')) continue; // e.g. 404.html
+  if (rel.endsWith('.html')) continue; // e.g. 404.html (checked separately)
+  if (rel.startsWith('og/')) continue; // link-preview templates, not pages
+  if (rel.startsWith('now-playing/')) continue; // the Now Playing templates fragment
   pages.push(base + rel);
 }
 pages.sort((a, b) => a.length - b.length || a.localeCompare(b));
@@ -148,22 +137,8 @@ const perSection = Object.fromEntries(
   console.log('');
 }
 
-const server = createServer(async (req, res) => {
-  const path = decodeURIComponent(new URL(req.url, 'http://x').pathname);
-  if (!path.startsWith(base)) return res.writeHead(404).end();
-  let file = normalize(join(dist, path.slice(base.length)));
-  if (!file.startsWith(dist)) return res.writeHead(403).end();
-  try {
-    if ((await stat(file)).isDirectory()) file = join(file, 'index.html');
-    const body = await readFile(file);
-    res.writeHead(200, { 'content-type': TYPES[extname(file)] ?? 'application/octet-stream' });
-    res.end(body);
-  } catch {
-    res.writeHead(404).end('Not found');
-  }
-});
-await new Promise((resolve) => server.listen(PORT, resolve));
-const origin = `http://localhost:${PORT}`;
+const server = await serveDist(PORT);
+const { origin } = server;
 console.log(dim(`Serving dist/ at ${origin}${base} (${pages.length} pages)\n`));
 
 const browser = await chromium.launch({ args: [`--remote-debugging-port=${CDP_PORT}`] });
@@ -387,6 +362,26 @@ console.log('');
           if (playing) {
             await tp.locator(`${OPEN} a[data-slug]`).first().focus();
             await tp.keyboard.press('Enter');
+            // The first play fetches the Now Playing templates: wait until it's playing.
+            await tp.waitForFunction(() =>
+              document.querySelector('[data-crate] a[aria-current="true"]'),
+            );
+            // Let the panel's smooth scroll finish (it can take over a second), then come back up.
+            await tp.evaluate(
+              () =>
+                new Promise((resolve) => {
+                  let last = -1;
+                  let still = 0;
+                  const started = performance.now();
+                  const check = () => {
+                    still = window.scrollY === last ? still + 1 : 0;
+                    last = window.scrollY;
+                    if (still >= 5 || performance.now() - started > 4000) resolve();
+                    else requestAnimationFrame(check);
+                  };
+                  requestAnimationFrame(check);
+                }),
+            );
             await tp.evaluate(() => {
               document.activeElement?.blur();
               window.scrollTo({ top: 0, behavior: 'instant' });
@@ -547,6 +542,15 @@ console.log('');
   if ((await page.locator('[data-np-panel]').count()) === 0) {
     console.log(dim('No Now Playing on the homepage; checks skipped.'));
   } else {
+    // The templates are fetched on the first crate hover (or play); wait for them.
+    await page.locator('[data-crate]').hover();
+    await page.waitForFunction(
+      () => document.querySelectorAll('template[data-np]').length > 0,
+      null,
+      {
+        timeout: 10000,
+      },
+    );
     // What's on each record's stage (from the templates).
     const kinds = await page.evaluate(() =>
       [...document.querySelectorAll('template[data-np]')].map((t) => ({
@@ -985,6 +989,141 @@ console.log('');
   console.log(dim(`    screenshots: docs/screenshots/phase-3/`));
 }
 
+// ---------- Phase 4: About, Contact, resume, link previews, search, 404 ----------
+
+console.log('');
+{
+  const results = [];
+  const check = (ok, msg) => {
+    results.push([ok, msg]);
+    if (!ok) fail(`site: ${msg}`);
+  };
+  const htmlOf = (path) => readFile(join(dist, path.slice(base.length), 'index.html'), 'utf8');
+  const attr = (html, re) => html.match(re)?.[1];
+  const liner = pages.find((p) => p.startsWith(`${base}records/`));
+
+  // About and Contact, and the header links that reach them from every page.
+  const home = await htmlOf(base);
+  check(/id="about"/.test(home) && /id="contact"/.test(home), 'homepage has About and Contact');
+  if (liner) check(/id="contact"/.test(await htmlOf(liner)), 'liner notes have Contact');
+  let navOk = true;
+  for (const path of pages) {
+    const html = await htmlOf(path);
+    if (!html.includes(`href="${base}#about"`) || !html.includes(`href="${base}#contact"`))
+      navOk = false;
+  }
+  check(navOk, `header About/Contact link to ${base}#about and ${base}#contact on every page`);
+
+  // Resume: a button with its size when public/resume.pdf exists, none at all otherwise.
+  const hasResume = await stat(join(publicDir, 'resume.pdf')).then(
+    () => true,
+    () => false,
+  );
+  const resumeLinks = [...home.matchAll(/<a[^>]*href="[^"]*resume\.pdf"[^>]*>([\s\S]*?)<\/a>/g)];
+  check(
+    hasResume
+      ? resumeLinks.length >= 2 &&
+          resumeLinks.every((m) => /\bdownload\b/.test(m[0]) && /PDF, \d/.test(m[1]))
+      : resumeLinks.length === 0,
+    hasResume
+      ? `resume.pdf exists: About and Contact offer it with its size and a download attribute (${resumeLinks.length} links)`
+      : 'no resume.pdf: no resume button anywhere',
+  );
+
+  // Copy email announces itself.
+  const context = await browser.newContext({ viewport: VIEWPORTS.desktop });
+  await context.grantPermissions(['clipboard-read', 'clipboard-write'], { origin });
+  const page = await context.newPage();
+  await page.goto(origin + base, { waitUntil: 'networkidle' });
+  await page.locator('[data-copy-email]').click();
+  await page.waitForTimeout(200);
+  const copied = await page.evaluate(async () => ({
+    status: document.querySelector('[data-copy-status]')?.textContent,
+    clip: await navigator.clipboard.readText(),
+  }));
+  check(
+    copied.status === 'Email copied' && copied.clip.includes('@'),
+    `Copy email copies the address and announces "${copied.status}"`,
+  );
+  const aboutAxe = await new AxeBuilder({ page }).include('#about').include('#contact').analyze();
+  check(
+    aboutAxe.violations.length === 0,
+    `axe clean on About and Contact ${aboutAxe.violations.map((v) => v.id).join(', ')}`,
+  );
+
+  // Link previews: absolute og:image pointing at an existing 1200×630 PNG; unique titles.
+  const titles = new Map();
+  const descriptions = new Map();
+  for (const path of pages) {
+    const html = await htmlOf(path);
+    const image = attr(html, /<meta property="og:image" content="([^"]+)"/);
+    const title = attr(html, /<title>([^<]*)<\/title>/);
+    const description = attr(html, /<meta name="description" content="([^"]*)"/);
+    titles.set(title, [...(titles.get(title) ?? []), path]);
+    descriptions.set(description, [...(descriptions.get(description) ?? []), path]);
+    let ok = Boolean(image) && /^https?:\/\//.test(image);
+    let size = '';
+    if (ok) {
+      const file = join(dist, new URL(image).pathname.slice(base.length));
+      const png = await readFile(file).catch(() => null);
+      ok = Boolean(png) && png.readUInt32BE(16) === 1200 && png.readUInt32BE(20) === 630;
+      size = png ? `${png.readUInt32BE(16)}×${png.readUInt32BE(20)}` : 'missing';
+    }
+    check(ok, `${path}: og:image ${image ? new URL(image).pathname : 'none'} ${size}`);
+  }
+  const dupes = [...titles, ...descriptions].filter(([, paths]) => paths.length > 1);
+  check(
+    dupes.length === 0,
+    `every page has a unique title and description ${dupes.map(([t]) => t).join(' | ')}`,
+  );
+  check(
+    /"@type":"Person"/.test(home) && /"jobTitle":"iOS Engineer"/.test(home),
+    'homepage carries a JSON-LD Person',
+  );
+
+  // Sitemap and robots.txt.
+  const sitemap = await readFile(join(dist, 'sitemap-0.xml'), 'utf8').catch(() => '');
+  const locs = [...sitemap.matchAll(/<loc>([^<]+)<\/loc>/g)].map((m) => new URL(m[1]).pathname);
+  check(
+    locs.length > 0 &&
+      pages.every((p) => locs.includes(p)) &&
+      locs.every((p) => !p.includes('/og/') && !/404/.test(p)),
+    `sitemap lists the ${pages.length} pages, no /og/ or 404 (${locs.length} URLs)`,
+  );
+  const robots = await readFile(join(dist, 'robots.txt'), 'utf8').catch(() => '');
+  const sitemapUrl = robots.match(/^Sitemap: (.+)$/m)?.[1] ?? '';
+  check(
+    /User-agent: \*/.test(robots) &&
+      new URL(sitemapUrl || 'http://x').pathname === `${base}sitemap-index.xml`,
+    `robots.txt allows all and points to ${sitemapUrl}`,
+  );
+
+  // 404 at a deep missing URL: styled, base-path safe, accessible.
+  const missing = `${origin}${base}records/nope/deeper`;
+  const response = await page.goto(missing, { waitUntil: 'networkidle' });
+  const look = await page.evaluate(() => ({
+    h1: document.querySelector('h1')?.textContent?.trim(),
+    font: getComputedStyle(document.querySelector('h1')).fontFamily,
+    bg: getComputedStyle(document.body).backgroundColor,
+    back: document.querySelector('a[data-404-home]')?.getAttribute('href'),
+    broken: [...document.images].filter((img) => !img.complete || img.naturalWidth === 0).length,
+  }));
+  const axe404 = await new AxeBuilder({ page }).analyze();
+  check(
+    response?.status() === 404 &&
+      look.h1 === "This record isn't in the crate." &&
+      look.font.includes('Big Shoulders') &&
+      look.bg === 'rgb(243, 237, 226)' &&
+      look.back === base &&
+      look.broken === 0 &&
+      axe404.violations.length === 0,
+    `404 at ${missing.slice(origin.length)} renders styled (${look.h1}; axe ${axe404.violations.length})`,
+  );
+  await context.close();
+
+  for (const [ok, msg] of results) console.log(`${ok ? green('✓') : red('✗')} site: ${msg}`);
+}
+
 // ---------- three.js must not load up front ----------
 
 /** Entry scripts of a page plus everything they import statically. */
@@ -1066,6 +1205,12 @@ for (const [path, mode] of lighthouseRuns) {
     return score === 100 ? green(text) : score >= 90 ? yellow(text) : red(text);
   });
   console.log(`Lighthouse ${mode.padEnd(7)} ${path}: ${scores.join(' · ')}`);
+  const seo = result?.lhr.categories.seo?.score ?? 0;
+  if (seo < 1) fail(`Lighthouse SEO ${Math.round(seo * 100)} on ${path} (${mode})`);
+  const perf = result?.lhr.categories.performance?.score ?? 0;
+  if (path === base && perf < 0.95) {
+    fail(`Lighthouse performance ${Math.round(perf * 100)} on the homepage (${mode}); budget 95`);
+  }
   const a11y = result?.lhr.categories.accessibility?.score ?? 0;
   if (a11y < 1) {
     fail(`Lighthouse accessibility ${Math.round(a11y * 100)} on ${path} (${mode})`);
@@ -1081,7 +1226,7 @@ for (const [path, mode] of lighthouseRuns) {
 }
 
 await browser.close();
-server.close();
+await server.close();
 
 // ---------- summary ----------
 

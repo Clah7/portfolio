@@ -1,0 +1,170 @@
+---
+/**
+ * 404: an empty slot in a small crate. GitHub Pages serves this file for any
+ * missing URL at any depth (e.g. /portfolio/records/nope/deeper), so every
+ * link and asset must be absolute with the base path: always use url().
+ * Styles are inlined by the build, and font URLs are absolute.
+ */
+import Base from '../layouts/Base.astro';
+import { site } from '../data/site';
+import { url } from '../lib/url';
+---
+
+<Base
+  title={`This record isn't in the crate · ${site.name}`}
+  description="That page isn't here. Head back to the crate to pick a record."
+  noindex
+>
+  <section class="page missing" aria-labelledby="missing-h">
+    <div class="crate" aria-hidden="true">
+      <span class="sleeve sleeve--a"></span>
+      <span class="slot"></span>
+      <span class="sleeve sleeve--b"></span>
+      <span class="front"></span>
+    </div>
+    <div class="text">
+      <p class="eyebrow">404 · Not found</p>
+      <h1 id="missing-h" class="d">
+        This record isn't in the crate.
+      </h1>
+      <p class="lede">The link may be old, or the record was moved to another shelf.</p>
+      <ul class="actions">
+        <li>
+          <a class="tap pill pill--solid" href={url('/')} data-404-home>
+            Back to the crate
+          </a>
+        </li>
+        <li>
+          <a class="tap pill" href={url('/#all-projects')}>
+            All records
+          </a>
+        </li>
+      </ul>
+    </div>
+  </section>
+</Base>
+
+<style>
+  .missing {
+    display: grid;
+    gap: 40px 64px;
+    align-items: center;
+    padding-block: 32px 72px;
+  }
+
+  @media (min-width: 820px) {
+    .missing {
+      grid-template-columns: minmax(0, 380px) minmax(0, 1fr);
+    }
+  }
+
+  /* A small crate: two sleeves with an empty, dashed slot between them */
+  .crate {
+    position: relative;
+    justify-self: center;
+    width: min(100%, 360px);
+    aspect-ratio: 1.15;
+  }
+
+  .crate > span {
+    position: absolute;
+  }
+
+  .sleeve,
+  .slot {
+    bottom: 26%;
+    width: 46%;
+    aspect-ratio: 1;
+  }
+
+  .sleeve {
+    background: var(--ink);
+    box-shadow: var(--shadow-sleeve);
+  }
+
+  .sleeve--a {
+    left: 4%;
+    background: #1e4d4f;
+    transform: rotate(-4deg);
+  }
+
+  .sleeve--b {
+    right: 4%;
+    background: #d9a898;
+    transform: rotate(5deg);
+  }
+
+  .slot {
+    left: 27%;
+    bottom: 30%;
+    border: 2px dashed var(--accent);
+    background: rgba(123, 38, 34, 0.04);
+  }
+
+  .front {
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: 40%;
+    background: var(--kraft);
+    box-shadow:
+      inset 0 6px 0 var(--kraft-light),
+      inset 0 -3px 0 var(--kraft-dark),
+      var(--shadow-box);
+  }
+
+  .text {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .eyebrow {
+    color: var(--accent);
+  }
+
+  h1 {
+    font-size: clamp(3rem, 8vw, 6rem);
+    line-height: 0.88;
+    font-weight: 900;
+  }
+
+  .lede {
+    max-width: 46ch;
+    font-size: 1.125rem;
+    color: var(--muted);
+  }
+
+  .actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px 12px;
+    padding: 0;
+    list-style: none;
+  }
+
+  .pill {
+    padding: 0 20px;
+    border: 1.5px solid var(--ink);
+    border-radius: var(--radius-pill);
+    color: var(--ink);
+    font-weight: 600;
+    text-decoration: none;
+  }
+
+  .pill:hover {
+    background: var(--paper-raised);
+    color: var(--ink);
+  }
+
+  .pill--solid {
+    background: var(--ink);
+    color: var(--paper);
+  }
+
+  .pill--solid:hover {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: var(--accent-ink);
+  }
+</style>
